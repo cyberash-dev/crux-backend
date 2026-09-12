@@ -1,0 +1,101 @@
+plan_id: 2026-08-22T141000Z-0sbt9
+created_at: 2026-08-22T14:10:00.789Z
+pending_attestations:
+  - id: extraction:REQ-011
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:00.789Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: extraction:EXT-005
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:00.845Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: extraction:ASM-011
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:00.905Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: extraction:DLT-011
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:00.966Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:REQ-026
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.026Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:REQ-027
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.087Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:INV-022
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.147Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:EXT-012
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.208Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:EXT-013
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.269Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:ASM-022
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.330Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-027
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.391Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-028
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.453Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: output:EXT-021
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.515Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: output:DLT-033
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T14:10:01.576Z
+    change_request: "M4 visuals and structuring: crop, illustrations, tables/diagrams/charts (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

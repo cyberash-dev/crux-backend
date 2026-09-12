@@ -1,0 +1,31 @@
+plan_id: 2026-08-19T195825Z-sip79
+created_at: 2026-08-19T19:58:25.198Z
+pending_attestations:
+  - id: pipeline:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T19:58:25.197Z
+    change_request: "MVP spec v0.1.0 — approval delegated by user in planning session 2026-08-19 (plan proud-sleeping-globe)"
+    scope: first-time-approval
+    target_status: approved
+  - id: extraction:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T19:58:25.255Z
+    change_request: "MVP spec v0.1.0 — approval delegated by user in planning session 2026-08-19 (plan proud-sleeping-globe)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T19:58:25.315Z
+    change_request: "MVP spec v0.1.0 — approval delegated by user in planning session 2026-08-19 (plan proud-sleeping-globe)"
+    scope: first-time-approval
+    target_status: approved
+  - id: output:*
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T19:58:25.376Z
+    change_request: "MVP spec v0.1.0 — approval delegated by user in planning session 2026-08-19 (plan proud-sleeping-globe)"
+    scope: first-time-approval
+    target_status: approved

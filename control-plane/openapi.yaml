@@ -1,0 +1,1190 @@
+openapi: 3.1.0
+info:
+  title: konspekt service API
+  version: 0.3.0
+  summary: Turn a YouTube lecture into fact-checked study notes, a quiz and a PDF, then examine a student on it.
+  description: |
+    Client API of the konspekt service (spec: `service:CON-001` for runs,
+    `service:CON-003` for exam sessions, surface `service:SUR-001`). The
+    service knows no end users: the client stores which of its users owns
+    which `run_id` and `exam_id`.
+
+    **Flow.** `POST /v1/runs` with a YouTube URL returns a `run_id` at once
+    (status `queued`). The run then executes in its own cloud sandbox:
+    the video is downloaded, transcribed, cut to the core material,
+    fact-checked against web sources and turned into notes, a quiz and a
+    PDF. Poll `GET /v1/runs/{run_id}` (every 15-30 s is plenty) until the
+    status is `succeeded` or `failed`, then read `GET /v1/runs/{run_id}/result`.
+    A 45-minute lecture takes roughly 15-20 minutes. At most
+    `MAX_PARALLEL_RUNS` runs (currently 1) execute at the same time; the
+    others wait in submission order with status `queued`.
+
+    **Authentication.** Every request carries
+    `Authorization: Bearer <SERVICE_API_KEY>`. Call the API from the
+    client's server side only (for example a Convex action): the key must
+    never reach a browser, and the API sends no CORS headers.
+
+    **Input limits.** Only public YouTube videos up to 4 hours are
+    processed; live streams, premieres, private, unlisted and
+    members-only videos end with `VIDEO_UNAVAILABLE`. Submit only videos
+    you have the rights to process.
+
+    **Files.** `result.files[].url` are unguessable download links that do
+    not expire; treat them as secrets or copy the files to your own
+    storage.
+
+    **Figures.** A `figure` block's `image_path` (for example
+    `frames/frame_125125.jpg`) maps to the result file whose `name` is
+    `md/images/` plus the file name part of `image_path`
+    (`md/images/frame_125125.jpg`).
+
+    **Fact-check notes.** A `factcheck_note` block's `claim_ref` is the
+    zero-based index of its claim in `result.claims`.
+
+    **Exam sessions.** `POST /v1/runs/{run_id}/exams` on a succeeded run
+    opens an exam session: an examiner questions the student on the
+    run's quiz until every question is mastered. The first question
+    arrives with the 201 response of the open, in `examiner_message`.
+    `POST /v1/exams/{exam_id}/messages` sends one student message and
+    returns the examiner's reply in the same response: replies are
+    synchronous, typically 5-15 s and at most 120 s, so set the HTTP
+    client timeout above 120 s. A reply that takes longer ends with 503
+    `EXAMINER_TIMEOUT` and nothing is stored; an examiner failure ends
+    with 503 `EXAMINER_FAILED` and nothing is stored either. Examiner
+    errors never use 502 or 504: the edge in front of the deployment
+    replaces those bodies with its own page. A session
+    answers one student message at a time: a message sent while the
+    previous one is still being answered gets 409
+    `EXAM_TURN_IN_PROGRESS`. A session stays `active`, with no time
+    limit, until every question is mastered (status `mastered`) or the
+    client closes it with `POST /v1/exams/{exam_id}/close` (status
+    `closed`). The service stores no student identity: the client maps
+    each `exam_id` to its user.
+servers:
+  - url: https://stoic-bird-582.eu-west-1.convex.site
+    description: Demo deployment
+security:
+  - serviceApiKey: []
+paths:
+  /v1/runs:
+    post:
+      operationId: submitRun
+      summary: Submit a YouTube lecture for processing
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitRunRequest"
+            examples:
+              watchUrl:
+                value:
+                  youtube_url: https://www.youtube.com/watch?v=ZA-tUyM_y7s
+                  lang: auto
+                  external_ref: lecture-42
+      responses:
+        "202":
+          description: Run accepted and queued. A repeated Idempotency-Key returns the run created first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunAccepted"
+              example:
+                run_id: jh734jt0w3revjphkp96hpx81n8e8mmf
+                status: queued
+                video_id: ZA-tUyM_y7s
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: The body is malformed or the URL is not a YouTube video URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                notYoutube:
+                  value:
+                    error:
+                      code: INPUT_NOT_YOUTUBE
+                      message: youtube_url is not a YouTube video URL
+                invalidRequest:
+                  value:
+                    error:
+                      code: INVALID_REQUEST
+                      message: lang must be one of auto, ru, en
+  /v1/runs/{run_id}:
+    get:
+      operationId: getRun
+      summary: Read the status and progress of a run
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Current run status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunStatus"
+              examples:
+                running:
+                  value:
+                    run_id: jh734jt0w3revjphkp96hpx81n8e8mmf
+                    external_ref: lecture-42
+                    video_id: ZA-tUyM_y7s
+                    status: running
+                    stages:
+                      - name: download
+                        completed_at: "2026-09-12T13:33:55.101Z"
+                      - name: ingest
+                        completed_at: "2026-09-12T13:34:25.471Z"
+                    error: null
+                    llm_spend_usd: null
+                    created_at: "2026-09-12T13:33:27.388Z"
+                    updated_at: "2026-09-12T13:35:02.004Z"
+                failed:
+                  value:
+                    run_id: jh718fym41mstd6cz82067f4nd8e8422
+                    external_ref: null
+                    video_id: ZA-tUyM_y7s
+                    status: failed
+                    stages: []
+                    error:
+                      code: VIDEO_UNAVAILABLE
+                      message: video is not public
+                    llm_spend_usd: null
+                    created_at: "2026-09-12T13:27:52.884Z"
+                    updated_at: "2026-09-12T13:28:31.057Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+  /v1/runs/{run_id}/result:
+    get:
+      operationId: getRunResult
+      summary: Read the results of a succeeded run
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Full result of a succeeded run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "409":
+          description: The run has not succeeded (still in progress, or failed).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: RUN_NOT_FINISHED
+                  message: run has not succeeded
+  /v1/runs/{run_id}/exams:
+    post:
+      operationId: openExam
+      summary: Open an exam session on a succeeded run
+      description: |
+        Starts an examiner for the run's quiz and returns the stored
+        session with its first examiner message, which asks the first quiz
+        question. No request body.
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "201":
+          description: Session opened; the session and its first examiner message are stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamOpened"
+              example:
+                exam_id: k97c2rv8x1h7ds0x4ntjw1d4b58e9a0q
+                run_id: jh734jt0w3revjphkp96hpx81n8e8mmf
+                status: active
+                progress:
+                  total: 2
+                  mastered: 0
+                  current_question_id: q1
+                  questions:
+                    - question_id: q1
+                      section_title: What an algorithm is
+                      status: pending
+                      attempts: 0
+                    - question_id: q2
+                      section_title: Correctness
+                      status: pending
+                      attempts: 0
+                examiner_message:
+                  seq: 1
+                  role: examiner
+                  text: |-
+                    Exam on "Introduction to algorithms". Question 1: What makes an algorithm correct?
+                    A) It finishes quickly
+                    B) It returns the right output for every valid input
+                    C) It passes the tests it was run on
+                    D) It uses little memory
+                  question_id: null
+                  verdict: null
+                  created_at: "2026-09-12T15:02:11.520Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "409":
+          description: The run has not succeeded (still in progress, or failed); no session is opened.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: RUN_NOT_FINISHED
+                  message: run has not succeeded
+        "503":
+          $ref: "#/components/responses/ExaminerFailed"
+  /v1/exams/{exam_id}:
+    get:
+      operationId: getExam
+      summary: Read the status and progress of an exam session
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      responses:
+        "200":
+          description: Current session status and progress.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Exam"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ExamNotFound"
+  /v1/exams/{exam_id}/messages:
+    get:
+      operationId: listExamMessages
+      summary: List the messages of an exam session
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      responses:
+        "200":
+          description: Every message of the session in seq order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamMessages"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ExamNotFound"
+    post:
+      operationId: postExamMessage
+      summary: Send a student message and receive the examiner's reply
+      description: |
+        Synchronous: the response arrives once the examiner has replied,
+        typically in 5-15 s and at most 120 s. On 200 both messages are
+        stored; on 503 nothing is stored and the same message can be sent
+        again.
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostExamMessageRequest"
+            example:
+              text: B
+      responses:
+        "200":
+          description: The student message, graded when it answers the current question, and the examiner's reply.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamReply"
+              example:
+                status: active
+                progress:
+                  total: 2
+                  mastered: 1
+                  current_question_id: q2
+                  questions:
+                    - question_id: q1
+                      section_title: What an algorithm is
+                      status: mastered
+                      attempts: 1
+                    - question_id: q2
+                      section_title: Correctness
+                      status: pending
+                      attempts: 0
+                student_message:
+                  seq: 2
+                  role: student
+                  text: B
+                  question_id: q1
+                  verdict: correct
+                  created_at: "2026-09-12T15:02:40.004Z"
+                examiner_message:
+                  seq: 3
+                  role: examiner
+                  text: "Correct. Question 2: ..."
+                  question_id: null
+                  verdict: null
+                  created_at: "2026-09-12T15:02:49.771Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ExamNotFound"
+        "409":
+          description: The session is mastered or closed, or another student message of the session is still being answered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                finished:
+                  value:
+                    error:
+                      code: EXAM_FINISHED
+                      message: exam is mastered or closed
+                turnInProgress:
+                  value:
+                    error:
+                      code: EXAM_TURN_IN_PROGRESS
+                      message: another message of this exam is being answered
+        "422":
+          description: The body is malformed, or text is missing, empty or longer than 4000 characters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_REQUEST
+                  message: text must be 1 to 4000 characters
+        "503":
+          description: |
+            The examiner failed (EXAMINER_FAILED) or did not answer within
+            120 s (EXAMINER_TIMEOUT); nothing was stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                failed:
+                  value:
+                    error:
+                      code: EXAMINER_FAILED
+                      message: the examiner failed; nothing was stored
+                timeout:
+                  value:
+                    error:
+                      code: EXAMINER_TIMEOUT
+                      message: the examiner did not answer within 120 s; nothing was stored
+  /v1/exams/{exam_id}/close:
+    post:
+      operationId: closeExam
+      summary: Close an exam session
+      description: |
+        An active session becomes closed; a mastered or closed session
+        keeps its status. No request body.
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      responses:
+        "200":
+          description: The session status after the close.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamClosed"
+              example:
+                exam_id: k97c2rv8x1h7ds0x4ntjw1d4b58e9a0q
+                status: closed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ExamNotFound"
+components:
+  securitySchemes:
+    serviceApiKey:
+      type: http
+      scheme: bearer
+      description: The SERVICE_API_KEY issued to the client.
+  parameters:
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      description: Identifier returned by POST /v1/runs.
+      schema:
+        type: string
+    ExamId:
+      name: exam_id
+      in: path
+      required: true
+      description: Identifier returned by POST /v1/runs/{run_id}/exams.
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Any client-chosen string; resubmitting with the same key returns the run created first instead of a new one.
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: Missing or wrong API key.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: missing or wrong credentials
+    RunNotFound:
+      description: No run with this id.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: RUN_NOT_FOUND
+              message: run not found
+    ExamNotFound:
+      description: No exam session with this id.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: EXAM_NOT_FOUND
+              message: exam not found
+    ExaminerFailed:
+      description: The examiner sandbox or model failed; nothing was stored.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error:
+              code: EXAMINER_FAILED
+              message: examiner failed
+  schemas:
+    SubmitRunRequest:
+      type: object
+      required: [youtube_url]
+      properties:
+        youtube_url:
+          type: string
+          format: uri
+          description: |
+            A YouTube video URL on youtube.com, www.youtube.com, m.youtube.com
+            or youtu.be: /watch?v=ID, /shorts/ID, /live/ID, /embed/ID or
+            youtu.be/ID, where ID has 11 characters [A-Za-z0-9_-]. Playlist,
+            channel and non-YouTube URLs are rejected with INPUT_NOT_YOUTUBE.
+        lang:
+          $ref: "#/components/schemas/Lang"
+        external_ref:
+          type: string
+          maxLength: 200
+          description: Opaque client reference echoed back in the run status.
+    Lang:
+      type: string
+      enum: [auto, ru, en]
+      default: auto
+      description: Lecture language; auto detects it from the speech.
+    RunAccepted:
+      type: object
+      required: [run_id, status, video_id]
+      properties:
+        run_id:
+          type: string
+        status:
+          type: string
+          const: queued
+        video_id:
+          $ref: "#/components/schemas/VideoId"
+    VideoId:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{11}$"
+    RunStatusValue:
+      type: string
+      enum: [queued, provisioning, running, succeeded, failed]
+      description: |
+        queued: waiting for a free slot. provisioning: the sandbox is being
+        created. running: the worker reports progress. succeeded and
+        failed are terminal.
+    StageName:
+      type: string
+      enum: [download, ingest, transcription, visual, segmentation, factcheck, notes, quiz, compose]
+      description: Processing stages in the order they complete.
+    RunErrorCode:
+      type: string
+      enum:
+        - SANDBOX_START_FAILED
+        - WORKER_LOST
+        - VIDEO_UNAVAILABLE
+        - DOWNLOAD_FAILED
+        - CONFIGURATION_ERROR
+        - PIPELINE_FAILED
+      description: |
+        SANDBOX_START_FAILED: the cloud sandbox could not start.
+        WORKER_LOST: the run stopped reporting for 15 minutes.
+        VIDEO_UNAVAILABLE: the video is not public, is live or upcoming,
+        is longer than 4 hours, or its metadata cannot be read.
+        DOWNLOAD_FAILED: the video could not be downloaded.
+        CONFIGURATION_ERROR: the service is misconfigured (operator issue).
+        PIPELINE_FAILED: processing failed after the download.
+    RunStatus:
+      type: object
+      required: [run_id, external_ref, video_id, status, stages, error, llm_spend_usd, created_at, updated_at]
+      properties:
+        run_id:
+          type: string
+        external_ref:
+          type: [string, "null"]
+        video_id:
+          $ref: "#/components/schemas/VideoId"
+        status:
+          $ref: "#/components/schemas/RunStatusValue"
+        stages:
+          type: array
+          description: Completed stages, in completion order.
+          items:
+            type: object
+            required: [name, completed_at]
+            properties:
+              name:
+                $ref: "#/components/schemas/StageName"
+              completed_at:
+                type: string
+                format: date-time
+        error:
+          description: Set exactly when status is failed.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [code, message]
+              properties:
+                code:
+                  $ref: "#/components/schemas/RunErrorCode"
+                message:
+                  type: string
+        llm_spend_usd:
+          type: [number, "null"]
+          description: Nominal model spend of the run; set when it succeeds.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RunResult:
+      type: object
+      required: [run_id, video, outline, sections, claims, quiz, cut_log, files]
+      properties:
+        run_id:
+          type: string
+        video:
+          $ref: "#/components/schemas/Video"
+        outline:
+          $ref: "#/components/schemas/Outline"
+        sections:
+          type: array
+          description: Top-level note sections in reading order; subsections are nested.
+          items:
+            $ref: "#/components/schemas/Section"
+        claims:
+          type: array
+          description: Fact-checked claims of the lecturer, in lecture order.
+          items:
+            $ref: "#/components/schemas/Claim"
+        quiz:
+          $ref: "#/components/schemas/Quiz"
+        cut_log:
+          type: array
+          description: Parts of the recording left out of the notes, with reasons.
+          items:
+            $ref: "#/components/schemas/CutLogEntry"
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResultFile"
+    Video:
+      type: object
+      required: [video_id, title, channel, duration_seconds]
+      properties:
+        video_id:
+          $ref: "#/components/schemas/VideoId"
+        title:
+          type: string
+        channel:
+          type: string
+        duration_seconds:
+          type: number
+    Outline:
+      type: object
+      required: [lecture_title, sections]
+      properties:
+        lecture_title:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/OutlineSection"
+    OutlineSection:
+      type: object
+      required: [section_id, title, start_seconds, end_seconds, subsections]
+      properties:
+        section_id:
+          type: string
+          description: Section id such as s1 or s1.2; matches Section.section_id.
+        title:
+          type: string
+        start_seconds:
+          type: number
+        end_seconds:
+          type: number
+        subsections:
+          type: array
+          items:
+            $ref: "#/components/schemas/OutlineSection"
+    Section:
+      type: object
+      required: [section_id, title, source_spans, subsections, blocks]
+      properties:
+        section_id:
+          type: string
+        title:
+          type: string
+        source_spans:
+          type: array
+          description: Time ranges of the recording this section is based on, as [start_seconds, end_seconds] pairs.
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+        subsections:
+          type: array
+          description: At most one nesting level.
+          items:
+            $ref: "#/components/schemas/Section"
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Block"
+    Block:
+      description: |
+        One content block. Every block object carries all keys (kind, text,
+        term, image_path, caption, source_ref, claim_ref, provenance, origin,
+        table, diagram, chart); keys that do not apply to the kind are null.
+        Text fields are Markdown in which defined terms appear as **term**.
+      oneOf:
+        - $ref: "#/components/schemas/ProseBlock"
+        - $ref: "#/components/schemas/DefinitionBlock"
+        - $ref: "#/components/schemas/FactBlock"
+        - $ref: "#/components/schemas/FigureBlock"
+        - $ref: "#/components/schemas/FactcheckNoteBlock"
+        - $ref: "#/components/schemas/TableBlock"
+        - $ref: "#/components/schemas/DiagramBlock"
+        - $ref: "#/components/schemas/ChartBlock"
+      discriminator:
+        propertyName: kind
+        mapping:
+          prose: "#/components/schemas/ProseBlock"
+          definition: "#/components/schemas/DefinitionBlock"
+          fact: "#/components/schemas/FactBlock"
+          figure: "#/components/schemas/FigureBlock"
+          factcheck_note: "#/components/schemas/FactcheckNoteBlock"
+          table: "#/components/schemas/TableBlock"
+          diagram: "#/components/schemas/DiagramBlock"
+          chart: "#/components/schemas/ChartBlock"
+    ProseBlock:
+      type: object
+      required: [kind, text]
+      properties:
+        kind:
+          const: prose
+        text:
+          type: string
+    DefinitionBlock:
+      type: object
+      required: [kind, term, text, origin]
+      properties:
+        kind:
+          const: definition
+        term:
+          type: string
+        text:
+          type: string
+        origin:
+          $ref: "#/components/schemas/Origin"
+    FactBlock:
+      type: object
+      required: [kind, text, origin]
+      properties:
+        kind:
+          const: fact
+        text:
+          type: string
+        origin:
+          $ref: "#/components/schemas/Origin"
+    Origin:
+      type: string
+      enum: [lecture, model_added]
+      description: lecture = stated in the lecture; model_added = added by the model and kept only after fact-checking.
+    FigureBlock:
+      type: object
+      required: [kind, image_path, source_ref, provenance]
+      properties:
+        kind:
+          const: figure
+        image_path:
+          type: string
+          description: Maps to the result file named md/images/<file name of image_path>.
+        caption:
+          type: [string, "null"]
+        source_ref:
+          type: string
+          description: "'video HH:MM:SS' for a video frame, the Wikimedia Commons file page URL for commons, 'generated:codex' for a generated image."
+        provenance:
+          type: string
+          enum: [video_frame, commons, generated]
+    FactcheckNoteBlock:
+      type: object
+      required: [kind, text, claim_ref]
+      properties:
+        kind:
+          const: factcheck_note
+        text:
+          type: string
+          description: The disagreement in one sentence, with the source link.
+        source_ref:
+          type: [string, "null"]
+        claim_ref:
+          type: integer
+          minimum: 0
+          description: Zero-based index into result.claims.
+    TableBlock:
+      type: object
+      required: [kind, table]
+      properties:
+        kind:
+          const: table
+        caption:
+          type: [string, "null"]
+        table:
+          type: object
+          required: [columns, rows]
+          properties:
+            columns:
+              type: array
+              minItems: 1
+              items:
+                type: string
+            rows:
+              type: array
+              minItems: 1
+              description: Every row has exactly as many cells as there are columns.
+              items:
+                type: array
+                items:
+                  type: string
+    DiagramBlock:
+      type: object
+      required: [kind, diagram]
+      properties:
+        kind:
+          const: diagram
+        caption:
+          type: [string, "null"]
+        diagram:
+          type: object
+          required: [kind, nodes, edges]
+          properties:
+            kind:
+              type: string
+              enum: [hierarchy, flow]
+            nodes:
+              type: array
+              minItems: 2
+              items:
+                type: object
+                required: [id, label]
+                properties:
+                  id:
+                    type: string
+                  label:
+                    type: string
+            edges:
+              type: array
+              items:
+                type: object
+                required: [source, target]
+                properties:
+                  source:
+                    type: string
+                  target:
+                    type: string
+                  label:
+                    type: [string, "null"]
+    ChartBlock:
+      type: object
+      required: [kind, chart]
+      properties:
+        kind:
+          const: chart
+        caption:
+          type: [string, "null"]
+        chart:
+          type: object
+          required: [kind, categories, series]
+          properties:
+            kind:
+              type: string
+              enum: [bar, line]
+            categories:
+              type: array
+              minItems: 1
+              items:
+                type: string
+            series:
+              type: array
+              minItems: 1
+              description: Every series has exactly as many values as there are categories.
+              items:
+                type: object
+                required: [name, values]
+                properties:
+                  name:
+                    type: string
+                  values:
+                    type: array
+                    items:
+                      type: number
+            x_title:
+              type: [string, "null"]
+            y_title:
+              type: [string, "null"]
+    Claim:
+      type: object
+      required: [claim_id, claim_text, span_start_seconds, span_end_seconds, verdict, sources, annotation, corrected_text]
+      properties:
+        claim_id:
+          type: string
+          description: c_ plus the zero-padded position, for example c_001.
+        claim_text:
+          type: string
+          description: The lecturer's statement verbatim; never rewritten.
+        span_start_seconds:
+          type: number
+        span_end_seconds:
+          type: number
+        verdict:
+          type: string
+          enum: [confirmed, disputed, mixed, unverified]
+          description: mixed = correct or incorrect depending on scope, terminology or simplification.
+        sources:
+          type: array
+          description: URLs of the web sources the verdict rests on; non-empty for confirmed, disputed and mixed.
+          items:
+            type: string
+            format: uri
+        annotation:
+          type: [string, "null"]
+          description: One-sentence rationale; set for disputed and mixed.
+        corrected_text:
+          type: [string, "null"]
+          description: Precise corrected wording; set only for disputed claims.
+    Quiz:
+      type: object
+      required: [format_version, lecture_title, language, questions]
+      properties:
+        format_version:
+          const: 2
+        lecture_title:
+          type: string
+        language:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizQuestion"
+    QuizQuestion:
+      type: object
+      required: [question_id, type, prompt, options, correct_options, model_answer, rubric, time_range, section_id, section_title]
+      properties:
+        question_id:
+          type: string
+        type:
+          type: string
+          enum: [single_choice, multi_select, open]
+        prompt:
+          type: string
+        options:
+          type: [array, "null"]
+          description: Exactly 4 answer options for single_choice and multi_select; null for open.
+          items:
+            type: string
+        correct_options:
+          type: [array, "null"]
+          description: Zero-based indices into options; exactly one for single_choice, at least two for multi_select; null for open.
+          items:
+            type: integer
+            minimum: 0
+            maximum: 3
+        model_answer:
+          type: [string, "null"]
+          description: Reference answer for open questions; null otherwise.
+        rubric:
+          description: Grading rubric; set exactly for open questions.
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/Rubric"
+        time_range:
+          type: object
+          required: [start_seconds, end_seconds]
+          description: Where in the recording the question's material is.
+          properties:
+            start_seconds:
+              type: number
+            end_seconds:
+              type: number
+        section_id:
+          type: string
+        section_title:
+          type: string
+    Rubric:
+      type: object
+      required: [max_points, concepts]
+      properties:
+        max_points:
+          type: integer
+        concepts:
+          type: array
+          items:
+            type: object
+            required: [description, points]
+            properties:
+              description:
+                type: string
+              points:
+                type: integer
+    CutLogEntry:
+      type: object
+      required: [start_seconds, end_seconds, label, reason]
+      properties:
+        start_seconds:
+          type: number
+        end_seconds:
+          type: number
+        label:
+          type: string
+          enum: [tangent, anecdote, admin]
+        reason:
+          type: string
+    ResultFile:
+      type: object
+      required: [kind, name, url, size_bytes, content_type]
+      properties:
+        kind:
+          $ref: "#/components/schemas/FileKind"
+        name:
+          type: string
+          description: konspekt.pdf, konspekt.md, or md/images/<file> for images referenced by figure blocks.
+        url:
+          type: string
+          format: uri
+          description: Unguessable, non-expiring download link.
+        size_bytes:
+          type: integer
+        content_type:
+          type: string
+    FileKind:
+      type: string
+      enum: [pdf, markdown, image]
+    ExamStatus:
+      type: string
+      enum: [active, mastered, closed]
+      description: |
+        active: the examiner accepts student messages. mastered: every quiz
+        question is mastered. closed: the client closed the session.
+        mastered and closed are terminal.
+    QuestionStatus:
+      type: string
+      enum: [pending, failed, mastered]
+      description: |
+        pending: not answered yet. failed: the last graded answer was
+        wrong; the question is asked again later. mastered: answered
+        correctly.
+    MessageRole:
+      type: string
+      enum: [examiner, student]
+    Verdict:
+      type: string
+      enum: [correct, incorrect]
+    Progress:
+      type: object
+      required: [total, mastered, current_question_id, questions]
+      properties:
+        total:
+          type: integer
+          description: Number of quiz questions.
+        mastered:
+          type: integer
+          description: Number of mastered questions.
+        current_question_id:
+          type: [string, "null"]
+          description: The question the examiner asked last; null once the session is mastered.
+        questions:
+          type: array
+          description: Every quiz question, in quiz order.
+          items:
+            $ref: "#/components/schemas/QuestionProgress"
+    QuestionProgress:
+      type: object
+      required: [question_id, section_title, status, attempts]
+      properties:
+        question_id:
+          type: string
+          description: Matches QuizQuestion.question_id in the run result.
+        section_title:
+          type: string
+        status:
+          $ref: "#/components/schemas/QuestionStatus"
+        attempts:
+          type: integer
+          minimum: 0
+          description: Graded answers to this question so far.
+    ExamMessage:
+      type: object
+      required: [seq, role, text, question_id, verdict, created_at]
+      properties:
+        seq:
+          type: integer
+          minimum: 1
+          description: Position in the session; starts at 1 and grows by 1.
+        role:
+          $ref: "#/components/schemas/MessageRole"
+        text:
+          type: string
+        question_id:
+          type: [string, "null"]
+          description: Set on a student message graded as an answer; the question it answers.
+        verdict:
+          description: Set on a student message graded as an answer.
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/Verdict"
+        created_at:
+          type: string
+          format: date-time
+    ExamOpened:
+      type: object
+      required: [exam_id, run_id, status, progress, examiner_message]
+      properties:
+        exam_id:
+          type: string
+        run_id:
+          type: string
+        status:
+          type: string
+          const: active
+        progress:
+          $ref: "#/components/schemas/Progress"
+        examiner_message:
+          $ref: "#/components/schemas/ExamMessage"
+    Exam:
+      type: object
+      required: [exam_id, run_id, status, progress, created_at, updated_at]
+      properties:
+        exam_id:
+          type: string
+        run_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/ExamStatus"
+        progress:
+          $ref: "#/components/schemas/Progress"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ExamMessages:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          description: In seq order.
+          items:
+            $ref: "#/components/schemas/ExamMessage"
+    PostExamMessageRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: The student's message; an answer to the current question, a question about the material or anything else.
+    ExamReply:
+      type: object
+      required: [status, progress, student_message, examiner_message]
+      properties:
+        status:
+          $ref: "#/components/schemas/ExamStatus"
+        progress:
+          $ref: "#/components/schemas/Progress"
+        student_message:
+          $ref: "#/components/schemas/ExamMessage"
+        examiner_message:
+          $ref: "#/components/schemas/ExamMessage"
+    ExamClosed:
+      type: object
+      required: [exam_id, status]
+      properties:
+        exam_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/ExamStatus"
+    ErrorCode:
+      type: string
+      enum:
+        - UNAUTHORIZED
+        - INVALID_REQUEST
+        - INPUT_NOT_YOUTUBE
+        - RUN_NOT_FOUND
+        - RUN_NOT_FINISHED
+        - NOT_FOUND
+        - EXAM_NOT_FOUND
+        - EXAM_FINISHED
+        - EXAM_TURN_IN_PROGRESS
+        - EXAMINER_FAILED
+        - EXAMINER_TIMEOUT
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message:
+              type: string

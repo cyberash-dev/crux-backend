@@ -1,0 +1,17 @@
+plan_id: 2026-08-20T080545Z-5yaz9
+created_at: 2026-08-20T08:05:45.812Z
+pending_attestations:
+  - id: analysis:DLT-024
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-20T08:05:45.811Z
+    change_request: "sectioned notes composition with plan-owned outline (user, 2026-08-20)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-025
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-20T08:05:45.870Z
+    change_request: "sectioned notes composition with plan-owned outline (user, 2026-08-20)"
+    scope: first-time-approval
+    target_status: approved

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+out/
+.sdd/plans/*.yaml
+.env
+uv.lock

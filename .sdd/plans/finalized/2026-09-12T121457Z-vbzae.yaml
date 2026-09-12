@@ -1,0 +1,45 @@
+plan_id: 2026-09-12T121457Z-vbzae
+created_at: 2026-09-12T12:14:57.566Z
+pending_attestations:
+  - id: analysis:EXT-014
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T12:14:57.566Z
+    change_request: "Exa evidence-first fact-check (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-034
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T12:14:57.624Z
+    change_request: "Exa evidence-first fact-check (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-035
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T12:14:57.684Z
+    change_request: "Exa evidence-first fact-check (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-036
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T12:14:57.745Z
+    change_request: "Exa evidence-first fact-check (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-037
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T12:14:57.807Z
+    change_request: "Exa evidence-first fact-check (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: pipeline:DLT-005
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T12:14:57.869Z
+    change_request: "Exa evidence-first fact-check (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

@@ -1,0 +1,17 @@
+plan_id: 2026-08-22T174822Z-q0xyb
+created_at: 2026-08-22T17:48:22.512Z
+pending_attestations:
+  - id: output:CON-032
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T17:48:22.505Z
+    change_request: "agent-facing Markdown bundle (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: pipeline:DLT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T17:48:22.567Z
+    change_request: "agent-facing Markdown bundle (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

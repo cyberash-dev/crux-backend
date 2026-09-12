@@ -1,0 +1,10 @@
+plan_id: 2026-08-22T180539Z-heujf
+created_at: 2026-08-22T18:05:39.786Z
+pending_attestations:
+  - id: output:DLT-034
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-22T18:05:39.785Z
+    change_request: "single-file konspekt.md next to the PDF (user request 2026-08-22, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

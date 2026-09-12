@@ -1,0 +1,2 @@
+class SearchCreditsExhaustedError(Exception):
+    pass

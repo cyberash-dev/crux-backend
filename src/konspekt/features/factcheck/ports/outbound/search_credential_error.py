@@ -1,0 +1,2 @@
+class SearchCredentialError(Exception):
+    pass

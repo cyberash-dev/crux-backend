@@ -1,0 +1,17 @@
+plan_id: 2026-08-19T203509Z-zg3wx
+created_at: 2026-08-19T20:35:09.907Z
+pending_attestations:
+  - id: pipeline:DLT-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T20:35:09.906Z
+    change_request: "switch LLM stages to subscription claude CLI per user instruction 2026-08-19"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:EXT-011
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T20:35:09.974Z
+    change_request: "switch LLM stages to subscription claude CLI per user instruction 2026-08-19"
+    scope: first-time-approval
+    target_status: approved

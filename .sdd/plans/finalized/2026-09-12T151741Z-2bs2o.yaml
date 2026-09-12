@@ -1,0 +1,10 @@
+plan_id: 2026-09-12T151741Z-2bs2o
+created_at: 2026-09-12T15:17:41.956Z
+pending_attestations:
+  - id: service:DLT-006
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T15:17:41.954Z
+    change_request: "examiner errors on 503 behind the Convex edge (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

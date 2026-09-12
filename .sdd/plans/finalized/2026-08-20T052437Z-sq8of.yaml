@@ -1,0 +1,10 @@
+plan_id: 2026-08-20T052437Z-sq8of
+created_at: 2026-08-20T05:24:37.855Z
+pending_attestations:
+  - id: extraction:DLT-010
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-20T05:24:37.851Z
+    change_request: "full-lecture run failure: oversized FLAC upload (2026-08-20)"
+    scope: first-time-approval
+    target_status: approved

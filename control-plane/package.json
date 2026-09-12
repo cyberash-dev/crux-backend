@@ -1,0 +1,20 @@
+{
+  "name": "konspekt-control-plane",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p convex"
+  },
+  "dependencies": {
+    "@daytona/sdk": "^0.211.2",
+    "convex": "^1.45.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "convex-test": "^0.0.58",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0",
+    "yaml": "^2.9.1"
+  }
+}

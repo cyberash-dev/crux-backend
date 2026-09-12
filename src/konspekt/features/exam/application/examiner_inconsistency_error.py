@@ -1,0 +1,2 @@
+class ExaminerInconsistencyError(Exception):
+    pass

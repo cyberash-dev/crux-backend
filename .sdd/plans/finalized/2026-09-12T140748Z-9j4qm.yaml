@@ -1,0 +1,10 @@
+plan_id: 2026-09-12T140748Z-9j4qm
+created_at: 2026-09-12T14:07:48.269Z
+pending_attestations:
+  - id: service:GEN-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:07:48.268Z
+    change_request: "OpenAPI description for the client team (user request in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

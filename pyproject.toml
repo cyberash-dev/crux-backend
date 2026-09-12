@@ -1,0 +1,34 @@
+[project]
+name = "konspekt"
+version = "0.1.0"
+description = "Lecture video to fact-checked study notes (PDF) with self-check quiz"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.90",
+    "elevenlabs>=2.0",
+    "pillow>=11.0",
+    "httpx>=0.28",
+    "typst>=0.13",
+    "typer>=0.15",
+    "mcp>=1.2",
+]
+
+[project.optional-dependencies]
+local-whisper = ["faster-whisper>=1.1"]
+
+[project.scripts]
+konspekt = "konspekt.pipeline.cli:app"
+konspekt-mcp = "konspekt.pipeline.mcp_server:main"
+konspekt-worker = "konspekt.worker.entrypoint:main"
+konspekt-exam-turn = "konspekt.features.exam.adapters.inbound.exam_turn_command:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[build-system]
+requires = ["uv_build>=0.10.0,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

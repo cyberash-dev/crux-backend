@@ -1,0 +1,10 @@
+plan_id: 2026-08-24T191437Z-q9qb0
+created_at: 2026-08-24T19:14:37.192Z
+pending_attestations:
+  - id: analysis:DLT-030
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-24T19:14:37.190Z
+    change_request: "score-derived verdict thresholds 85/50 (user decision 2026-08-24, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

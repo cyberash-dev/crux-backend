@@ -1,0 +1,87 @@
+plan_id: 2026-09-12T144908Z-twvjw
+created_at: 2026-09-12T14:49:08.060Z
+pending_attestations:
+  - id: service:CON-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.059Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:CON-004
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.120Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:SUR-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.184Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:REQ-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.245Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:REQ-004
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.308Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:INV-001
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.372Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:EXT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.436Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:ASM-002
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.500Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:DLT-002
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.562Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:DLT-003
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.626Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:DLT-004
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.692Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved
+  - id: service:DLT-005
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-12T14:49:08.755Z
+    change_request: "exam sessions with the examiner (user approval in chat 2026-09-12, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

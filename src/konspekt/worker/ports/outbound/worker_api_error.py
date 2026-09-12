@@ -1,0 +1,2 @@
+class WorkerApiError(Exception):
+    pass

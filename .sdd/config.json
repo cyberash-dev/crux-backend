@@ -1,0 +1,37 @@
+{
+  "$schema": "https://github.com/cyberash-dev/agent-sdd/blob/main/schema/sdd.config.schema.json",
+  "spec_file": "spec/pipeline.md",
+  "baseline_id": "pipeline:BL-001",
+  "discovery_scope": ["src", "tests", "pyproject.toml"],
+  "mechanism": "git_tree_hash_v1",
+  "lint": {
+    "spec_files": ["spec/*.md"]
+  },
+  "partitions": {
+    "pipeline": {
+      "spec_paths": ["spec/pipeline.md"],
+      "test_paths": ["tests/**/*.py"],
+      "sandbox_paths": ["spike/**"]
+    },
+    "extraction": {
+      "spec_paths": ["spec/extraction.md"],
+      "test_paths": ["tests/**/*.py"],
+      "sandbox_paths": ["spike/**"]
+    },
+    "analysis": {
+      "spec_paths": ["spec/analysis.md"],
+      "test_paths": ["tests/**/*.py"],
+      "sandbox_paths": ["spike/**"]
+    },
+    "output": {
+      "spec_paths": ["spec/output.md"],
+      "test_paths": ["tests/**/*.py"],
+      "sandbox_paths": ["spike/**"]
+    },
+    "service": {
+      "spec_paths": ["spec/service.md"],
+      "test_paths": ["tests/**/*.py", "control-plane/**/*.test.ts"],
+      "sandbox_paths": ["spike/**"]
+    }
+  }
+}

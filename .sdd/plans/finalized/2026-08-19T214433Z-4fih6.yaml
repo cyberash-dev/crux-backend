@@ -1,0 +1,17 @@
+plan_id: 2026-08-19T214433Z-4fih6
+created_at: 2026-08-19T21:44:33.240Z
+pending_attestations:
+  - id: analysis:REQ-025
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T21:44:33.239Z
+    change_request: "acceptance feedback round 2: standalone prose style, quiz leaves the PDF (user, 2026-08-19)"
+    scope: first-time-approval
+    target_status: approved
+  - id: output:DLT-031
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T21:44:33.300Z
+    change_request: "acceptance feedback round 2: standalone prose style, quiz leaves the PDF (user, 2026-08-19)"
+    scope: first-time-approval
+    target_status: approved

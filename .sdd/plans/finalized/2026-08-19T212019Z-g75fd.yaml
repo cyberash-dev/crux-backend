@@ -1,0 +1,31 @@
+plan_id: 2026-08-19T212019Z-g75fd
+created_at: 2026-08-19T21:20:19.952Z
+pending_attestations:
+  - id: analysis:DLT-020
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T21:20:19.952Z
+    change_request: "acceptance feedback round 1: rich markup, multi-correct quiz export, full coverage (user, 2026-08-19)"
+    scope: first-time-approval
+    target_status: approved
+  - id: analysis:DLT-021
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T21:20:20.012Z
+    change_request: "acceptance feedback round 1: rich markup, multi-correct quiz export, full coverage (user, 2026-08-19)"
+    scope: first-time-approval
+    target_status: approved
+  - id: output:DLT-030
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T21:20:20.075Z
+    change_request: "acceptance feedback round 1: rich markup, multi-correct quiz export, full coverage (user, 2026-08-19)"
+    scope: first-time-approval
+    target_status: approved
+  - id: output:CON-031
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-08-19T21:20:20.139Z
+    change_request: "acceptance feedback round 1: rich markup, multi-correct quiz export, full coverage (user, 2026-08-19)"
+    scope: first-time-approval
+    target_status: approved
