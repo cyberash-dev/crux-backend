@@ -23,7 +23,7 @@ CLAUDE_CODE_INSTALL = (
 )
 PROJECT_INSTALL = f"pip install --no-cache-dir --no-deps {PROJECT_DIR}"
 SANDBOX_PATH = "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-SNAPSHOT_RESOURCES = Resources(cpu=1, memory=2, disk=5)
+SNAPSHOT_RESOURCES = Resources(cpu=1, memory=1, disk=3)
 
 
 def head_short_sha() -> str:

@@ -3,7 +3,7 @@
 `build_snapshot.py` bakes the image the konspekt cloud worker runs in: python:3.14-slim, ffmpeg,
 tesseract (rus, eng), uv, yt-dlp, deno, Claude Code, the project under `/opt/konspekt`
 (`uv sync --frozen --no-dev`, so `/opt/konspekt/.venv/bin/konspekt` is on PATH) and the local Typst
-package cache. Resources: 4 vCPU, 8 GiB RAM, 10 GiB disk.
+package cache. Resources: 4 vCPU, 4 GiB RAM, 10 GiB disk.
 
 Needs `DAYTONA_API_KEY` (both scripts) and `PROXY_URL` (smoke test) in `.env`, plus Typst packages
 in `~/Library/Caches/typst/packages/preview` (compile one konspekt PDF locally first).
@@ -21,7 +21,7 @@ stops at the first failing command with a non-zero exit, and always deletes the 
 `build_examiner_snapshot.py` bakes the light image the exam examiner runs in: python:3.14-slim,
 curl, Claude Code and the project under `/opt/konspekt` installed with `pip install --no-deps`
 (the turn command needs only the standard library), so `konspekt-exam-turn` is on PATH. Resources:
-1 vCPU, 2 GiB RAM, 5 GiB disk. The control plane creates examiner sandboxes from the snapshot named
+1 vCPU, 1 GiB RAM, 3 GiB disk. The control plane creates examiner sandboxes from the snapshot named
 in its `EXAMINER_SNAPSHOT` env var; rebuild the snapshot and update the variable together with any
 change to the turn protocol.
 
@@ -39,3 +39,11 @@ into `/root/exam`, runs `konspekt-exam-turn`, prints its output and timings, exi
 `deploy/e2e_exam.py [RUN_ID]` checks the deployed exam API end to end (needs `SERVICE_API_KEY`): it
 opens an exam on a succeeded run, answers the first question wrong once and every other question
 from the quiz key until the session is mastered, and prints each turn's verdict and latency.
+
+# Capacity
+
+The two sizes are chosen for the Daytona organization quota of 10 vCPU, 10 GiB RAM and 30 GiB
+disk (`service:ASM-002`): two run sandboxes (`MAX_PARALLEL_RUNS=2`) and two examiner sandboxes fit
+at once. A 46-minute lecture peaked at about 2 GiB of memory in a run sandbox. Raise
+`MAX_PARALLEL_RUNS` or the sandbox sizes only together with the quota; an examiner sandbox that
+does not fit makes opening or continuing an exam fail with `EXAMINER_FAILED`.

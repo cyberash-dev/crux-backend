@@ -38,7 +38,7 @@ SANDBOX_PATH = ":".join(
         "/bin",
     )
 )
-SNAPSHOT_RESOURCES = Resources(cpu=4, memory=8, disk=10)
+SNAPSHOT_RESOURCES = Resources(cpu=4, memory=4, disk=10)
 
 
 def head_short_sha() -> str:
