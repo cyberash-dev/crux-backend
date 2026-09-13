@@ -492,6 +492,83 @@ test_obligation:
 
 ```yaml
 ---
+id: service:REQ-005
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:24:11.452Z
+    change_request: proxy health monitoring with Telegram alerts (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+title: the control plane tracks which proxies YouTube blocks and reports every status change to Telegram
+given: |
+  - PROXY_URL holds the proxy list (service:REQ-001)
+  - TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set in the
+    control-plane env (service:EXT-004)
+when: the hourly proxy probe runs, or a worker reports DOWNLOAD_BLOCKED
+then: |
+  Every hour the control plane probes each proxy of the list with one
+  GET of the YouTube watch page of a fixed public video through that
+  proxy (service:EXT-005) and stops reading the body once the player
+  playability status is found. LOGIN_REQUIRED whose reason asks to sign
+  in to confirm the requester is not a bot marks the proxy blocked; OK
+  marks it ok; anything else, a network error or a missing status
+  marks it unknown and keeps its previous ok or blocked status for the
+  change check. A DOWNLOAD_BLOCKED completion (service:REQ-001) marks
+  the proxy of that sandbox blocked at once. The control plane stores
+  per proxy index its status, the time that status began and the time
+  of the last check; it stores no proxy URL. When a proxy changes
+  between ok and blocked it sends one Telegram message naming the proxy
+  index, its port and the new status; when the last ok proxy becomes
+  blocked it also sends a message that every proxy is blocked. A probe
+  or a failed message never changes a run.
+negative_cases:
+  - TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing => statuses are still
+    stored, no message is sent, and a warning is logged
+  - Telegram answers with an error => the error is logged without the
+    bot token; the status change stays stored
+out_of_scope:
+  - probing proxies other than the PROXY_URL list
+  - replacing or retiring a blocked proxy automatically
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: multi_no_shared_mutable
+  read_consistency: strong
+  idempotency: none
+  time_source: server_clock
+data_scope: all_data
+policy_refs:
+  - service:POL-001
+test_obligation:
+  predicate: |
+    Over a fake fetch and a fake clock: a LOGIN_REQUIRED bot-check page
+    marks the proxy blocked, an OK page marks it ok, a page without a
+    status or a network error marks it unknown; reading stops after the
+    status; a change between ok and blocked sends exactly one message
+    with the proxy index and port and a repeat of the same status sends
+    none; the last ok proxy turning blocked adds the every-proxy
+    message; a DOWNLOAD_BLOCKED completion marks its proxy blocked; no
+    stored document or message contains a proxy URL or the bot token;
+    missing Telegram env stores statuses without sending.
+  test_template: integration
+  boundary_classes:
+    - blocked, ok and unknown probe results
+    - change and no-change notifications
+    - every proxy blocked
+    - blocked completion from a run
+    - missing Telegram env
+  failure_scenarios:
+    - a message on every hourly probe instead of on change
+    - a proxy URL or the bot token in a message or a log line
+---
+```
+
+```yaml
+---
 id: service:INV-001
 type: Invariant
 lifecycle:
@@ -1132,6 +1209,112 @@ test_obligation:
 ---
 ```
 
+```yaml
+---
+id: service:EXT-004
+type: ExternalDependency
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:24:11.515Z
+    change_request: proxy health monitoring with Telegram alerts (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+provider: Telegram Bot API
+provider_surface: "POST https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/sendMessage"
+authority_url_or_doc: "https://core.telegram.org/bots/api#sendmessage"
+consumer_contract:
+  request:
+    - "sendMessage with JSON body {chat_id: TELEGRAM_CHAT_ID, text}; text
+      is plain, without parse mode"
+  response_expectations:
+    - "{ok: true} on success; {ok: false, description} otherwise"
+drift_detection:
+  mechanism: "none_with_review_by:2026-11-01"
+last_verified_at: 2026-09-13
+auth_scope:
+  - bot token via control-plane env TELEGRAM_BOT_TOKEN; the chat via
+    TELEGRAM_CHAT_ID
+rate_limits:
+  - a handful of messages per day; far below the Bot API limits
+retry/idempotency:
+  - no retry; a failed message is logged and dropped
+error_taxonomy:
+  - "network error or ok false => logged without the token"
+sandbox_or_fixture:
+  - tests use a fake fetch; no live Telegram calls in tests
+test_obligation:
+  predicate: |
+    The Telegram adapter posts chat_id and text to the sendMessage URL
+    of the configured token, reports ok false and network errors as a
+    typed failure, and never puts the token into an error message.
+  test_template: contract
+  boundary_classes:
+    - request shape
+    - ok false
+    - network error
+  failure_scenarios:
+    - the bot token in a logged error
+---
+```
+
+```yaml
+---
+id: service:EXT-005
+type: ExternalDependency
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:24:11.579Z
+    change_request: proxy health monitoring with Telegram alerts (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+provider: YouTube watch page through the proxy pool
+provider_surface: "GET https://www.youtube.com/watch?v=<fixed public video id> through one proxy of PROXY_URL"
+authority_url_or_doc: "https://www.youtube.com"
+consumer_contract:
+  request:
+    - "one GET per proxy per probe with a desktop browser User-Agent and
+      Accept-Language en-US"
+  response_expectations:
+    - the HTML embeds the player response with
+      "playabilityStatus":{"status":"<STATUS>","reason":"<text>"};
+      a blocked exit IP gets LOGIN_REQUIRED with a reason asking to sign
+      in to confirm the requester is not a bot; a clean one gets OK
+drift_detection:
+  mechanism: "none_with_review_by:2026-10-15"
+last_verified_at: 2026-09-13
+auth_scope:
+  not_applicable: public_page
+  reason: the watch page of a public video needs no account
+rate_limits:
+  - one request per proxy per hour
+retry/idempotency:
+  - no retry; the next hourly probe checks again
+error_taxonomy:
+  - "status absent, non-200 answer or network error => unknown"
+sandbox_or_fixture:
+  - tests use HTML fixtures of an OK page and a bot-check page; no live
+    YouTube in tests
+test_obligation:
+  predicate: |
+    The probe classifies the bot-check fixture as blocked, the OK fixture
+    as ok and a fixture without playabilityStatus as unknown, and stops
+    reading the body once the status is found.
+  test_template: contract
+  boundary_classes:
+    - bot-check page
+    - OK page
+    - page without status
+  failure_scenarios:
+    - the whole 1.4 MB page read on every probe
+---
+```
+
 ## 10. Generated artifacts
 
 ```yaml
@@ -1229,8 +1412,9 @@ predicate: |
   ELEVENLABS_API_KEY, EXA_API_KEY and SERVICE_API_KEY live only in the
   control-plane environment and the run's sandbox environment, except
   that an examiner sandbox receives CLAUDE_CODE_OAUTH_TOKEN and no
-  other secret; no endpoint response, run or exam document or log line
-  contains them.
+  other secret; TELEGRAM_BOT_TOKEN lives only in the control-plane
+  environment; no endpoint response, run, exam or proxy health
+  document, Telegram message or log line contains them.
 negative_test_obligations:
   - status and result responses of a run contain none of the configured
     secret values
@@ -1624,6 +1808,36 @@ tests_old_behavior:
 tests_new_behavior:
   - control-plane/convex/workerApi.test.ts (DOWNLOAD_BLOCKED completion
     accepted)
+---
+```
+
+```yaml
+---
+id: service:DLT-012
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:24:11.645Z
+    change_request: proxy health monitoring with Telegram alerts (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+target_id: service:POL-001
+kind: extend
+compatibility_action: ignore
+baseline_version: 8c18c6b
+summary: |
+  TELEGRAM_BOT_TOKEN joins the secrets that live only in the
+  control-plane environment (service:REQ-005, service:EXT-004); proxy
+  health documents and Telegram messages join the places that never
+  contain a secret.
+tests_old_behavior:
+  - control-plane/convex/secretPolicy.test.ts (run and exam secrets)
+tests_new_behavior:
+  - control-plane/convex/secretPolicy.test.ts (bot token and proxy URLs
+    absent from proxy health documents and messages)
 ---
 ```
 
