@@ -81,14 +81,14 @@ discovery_scope:
   - pyproject.toml
 coverage_evidence:
   - kind: git_tree_hash_v1
-    reference: 9f61fd77f21a0bf4aea912131eda17f2da166484
+    reference: 96992affa7b69457c3be4b3ae0b8b83f2f1ae71f
     note: |
       Greenfield project: the baseline covers the initial package
       skeleton only. spec/ and .sdd/config.json stay outside the scope
       because BL-001 stores the token inside spec/pipeline.md; including
       them would make the token self-referential.
-freshness_token: 18fad9d042c967af338591f6b313e54d2af812f5681727bfbc0690c5e3452a11
-baseline_commit_sha: 9f61fd77f21a0bf4aea912131eda17f2da166484
+freshness_token: e7be7d81c8845e9d53b78abadb2234b510e7be71e1faebc1c6243b5ac8ef1fae
+baseline_commit_sha: 96992affa7b69457c3be4b3ae0b8b83f2f1ae71f
 mechanism: git_tree_hash_v1
 notes: |
   Greenfield baseline: no pre-existing behavior is preserved.
