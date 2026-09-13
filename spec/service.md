@@ -520,11 +520,13 @@ then: |
   change check. A DOWNLOAD_BLOCKED completion (service:REQ-001) marks
   the proxy of that sandbox blocked at once. The control plane stores
   per proxy index its status, the time that status began and the time
-  of the last check; it stores no proxy URL. When a proxy changes
-  between ok and blocked it sends one Telegram message naming the proxy
-  index, its port and the new status; when the last ok proxy becomes
-  blocked it also sends a message that every proxy is blocked. A probe
-  or a failed message never changes a run.
+  of the last check; it stores no proxy URL. A proxy without a stored
+  ok or blocked status counts as ok. When the set of blocked proxies
+  differs from the set before a probe or a blocked completion, it sends
+  one Telegram summary with the number of ok proxies out of the list and
+  the ports of the blocked ones (0 of N when every proxy is blocked); an
+  unchanged set sends nothing. A probe or a failed message never
+  changes a run.
 negative_cases:
   - TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing => statuses are still
     stored, no message is sent, and a warning is logged
@@ -548,10 +550,10 @@ test_obligation:
     Over a fake fetch and a fake clock: a LOGIN_REQUIRED bot-check page
     marks the proxy blocked, an OK page marks it ok, a page without a
     status or a network error marks it unknown; reading stops after the
-    status; a change between ok and blocked sends exactly one message
-    with the proxy index and port and a repeat of the same status sends
-    none; the last ok proxy turning blocked adds the every-proxy
-    message; a DOWNLOAD_BLOCKED completion marks its proxy blocked; no
+    status; a changed blocked set sends exactly one summary with the ok
+    count and the blocked ports, an unchanged set sends none, and every
+    proxy blocked reads 0 of N; a DOWNLOAD_BLOCKED completion marks its
+    proxy blocked and sends a summary when the set changes; no
     stored document or message contains a proxy URL or the bot token;
     missing Telegram env stores statuses without sending.
   test_template: integration
@@ -564,6 +566,81 @@ test_obligation:
   failure_scenarios:
     - a message on every hourly probe instead of on change
     - a proxy URL or the bot token in a message or a log line
+---
+```
+
+```yaml
+---
+id: service:REQ-006
+type: Behavior
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:49:45.025Z
+    change_request: proxy summary and run notifications in the operator chat (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+title: the operator chat hears about every submitted run and every finished run
+given: |
+  - TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set in the
+    control-plane env (service:EXT-004)
+when: a client submits a new run (service:CON-001), or a run reaches succeeded or failed (service:REQ-001)
+then: |
+  After POST /v1/runs stores a new run, the control plane sends one
+  Telegram message with the YouTube URL, the run id, the external_ref
+  when the client gave one, the number of queued runs submitted before
+  it and the number of active runs out of MAX_PARALLEL_RUNS. When a run
+  becomes succeeded it sends one message with the video title, the URL,
+  the run id and the time from submission to success in whole minutes;
+  when a run becomes failed it sends one message with the URL, the run
+  id, the error code, the redacted error message cut to 200 characters
+  and the time from submission in whole minutes. Messages are sent
+  after the transaction that changed the run, so the API answer and the
+  run never wait for or depend on Telegram.
+negative_cases:
+  - a resubmission with an Idempotency-Key that returns an existing run
+    => no message
+  - a DOWNLOAD_BLOCKED completion that provisions the run again =>
+    no finish message; the run is not terminal
+  - TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing => no message and a
+    warning is logged
+  - Telegram answers with an error => the error is logged without the
+    bot token
+out_of_scope:
+  - messages about exam sessions
+  - user identity beyond the client's external_ref
+applicability:
+  invariant_to_all_axes: true
+concurrency_model:
+  actor_concurrency: multi_no_shared_mutable
+  read_consistency: strong
+  idempotency: none
+  time_source: server_clock
+data_scope: all_data
+policy_refs:
+  - service:POL-001
+test_obligation:
+  predicate: |
+    Over a fake operator chat: a new run sends one message with its URL,
+    run id, external_ref and queue numbers; an idempotent resubmission
+    sends none; a succeeded run sends one message with the title and
+    minutes; a failed run sends one message with the code, the redacted
+    message and minutes; a re-provisioned blocked run sends no finish
+    message; missing Telegram env sends nothing; no message carries a
+    secret.
+  test_template: integration
+  boundary_classes:
+    - new run
+    - idempotent resubmission
+    - succeeded run
+    - failed run
+    - re-provisioned blocked run
+    - missing Telegram env
+  failure_scenarios:
+    - a run submission slowed or failed by Telegram
+    - two finish messages for one run
 ---
 ```
 
@@ -1838,6 +1915,37 @@ tests_old_behavior:
 tests_new_behavior:
   - control-plane/convex/secretPolicy.test.ts (bot token and proxy URLs
     absent from proxy health documents and messages)
+---
+```
+
+```yaml
+---
+id: service:DLT-013
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:49:45.084Z
+    change_request: proxy summary and run notifications in the operator chat (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+target_id: service:REQ-005
+kind: replace
+compatibility_action: ignore
+baseline_version: 090082a
+summary: |
+  Proxy alerts become one summary per change of the blocked set (ok
+  count out of the list and the blocked ports) instead of one message
+  per proxy plus an every-proxy message, as the operator asked; the
+  probe and the stored statuses are unchanged.
+tests_old_behavior:
+  - control-plane/convex/proxyHealth.test.ts (probe classification and
+    stored statuses)
+tests_new_behavior:
+  - control-plane/convex/proxyHealth.test.ts (one summary per changed
+    blocked set, none for an unchanged set)
 ---
 ```
 
