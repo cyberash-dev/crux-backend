@@ -10,6 +10,7 @@
 
 import type * as clientApi from "../clientApi.js";
 import type * as config_env from "../config/env.js";
+import type * as config_proxyUrls from "../config/proxyUrls.js";
 import type * as crons from "../crons.js";
 import type * as dispatcher from "../dispatcher.js";
 import type * as examApi from "../examApi.js";
@@ -35,6 +36,7 @@ import type * as model_examMessageView from "../model/examMessageView.js";
 import type * as model_examValidators from "../model/examValidators.js";
 import type * as model_examView from "../model/examView.js";
 import type * as model_examVocabulary from "../model/examVocabulary.js";
+import type * as model_proxyRotation from "../model/proxyRotation.js";
 import type * as model_runLifecycle from "../model/runLifecycle.js";
 import type * as model_runLookup from "../model/runLookup.js";
 import type * as model_runStatusView from "../model/runStatusView.js";
@@ -74,6 +76,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   clientApi: typeof clientApi;
   "config/env": typeof config_env;
+  "config/proxyUrls": typeof config_proxyUrls;
   crons: typeof crons;
   dispatcher: typeof dispatcher;
   examApi: typeof examApi;
@@ -99,6 +102,7 @@ declare const fullApi: ApiFromModules<{
   "model/examValidators": typeof model_examValidators;
   "model/examView": typeof model_examView;
   "model/examVocabulary": typeof model_examVocabulary;
+  "model/proxyRotation": typeof model_proxyRotation;
   "model/runLifecycle": typeof model_runLifecycle;
   "model/runLookup": typeof model_runLookup;
   "model/runStatusView": typeof model_runStatusView;

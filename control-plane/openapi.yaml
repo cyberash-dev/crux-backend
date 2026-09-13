@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: konspekt service API
-  version: 0.3.0
+  version: 0.4.0
   summary: Turn a YouTube lecture into fact-checked study notes, a quiz and a PDF, then examine a student on it.
   description: |
     Client API of the konspekt service (spec: `service:CON-001` for runs,
@@ -535,6 +535,7 @@ components:
         - WORKER_LOST
         - VIDEO_UNAVAILABLE
         - DOWNLOAD_FAILED
+        - DOWNLOAD_BLOCKED
         - CONFIGURATION_ERROR
         - PIPELINE_FAILED
       description: |
@@ -543,6 +544,8 @@ components:
         VIDEO_UNAVAILABLE: the video is not public, is live or upcoming,
         is longer than 4 hours, or its metadata cannot be read.
         DOWNLOAD_FAILED: the video could not be downloaded.
+        DOWNLOAD_BLOCKED: YouTube's bot check blocked the download through
+        every proxy; submitting the run again later may succeed.
         CONFIGURATION_ERROR: the service is misconfigured (operator issue).
         PIPELINE_FAILED: processing failed after the download.
     RunStatus:

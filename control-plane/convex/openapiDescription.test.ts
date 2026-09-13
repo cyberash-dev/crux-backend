@@ -2,6 +2,7 @@
 /* @covers service:GEN-001 */
 /* @covers service:DLT-001 */
 /* @covers service:DLT-005 */
+/* @covers service:DLT-010 */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";

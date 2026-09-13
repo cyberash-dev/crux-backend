@@ -1,14 +1,16 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
+import { takeProxyIndex } from "./model/proxyRotation";
 import { finishRun } from "./model/runLifecycle";
 import { existingRun } from "./model/runLookup";
 import { isTerminalStatus, type RunLang } from "./model/runVocabulary";
 
-export type ProvisioningClaim = { youtube_url: string; lang: RunLang };
+export type ProvisioningClaim = { youtube_url: string; lang: RunLang; proxy_index: number | null };
 
-/* The token hash is written at most once, so a repeated provisioning action
-   for the same run gets no claim and starts no second sandbox. */
+/* The token hash is written at most once per provisioning, so a repeated
+   provisioning action for the same run gets no claim and starts no second
+   sandbox. */
 export const claimProvisioning = internalMutation({
   args: { runId: v.id("runs"), tokenHash: v.string() },
   handler: async (ctx, { runId, tokenHash }): Promise<ProvisioningClaim | null> => {
@@ -16,8 +18,13 @@ export const claimProvisioning = internalMutation({
     if (run.status !== "provisioning" || run.token_hash !== undefined) {
       return null;
     }
-    await ctx.db.patch("runs", runId, { token_hash: tokenHash, updated_at: Date.now() });
-    return { youtube_url: run.youtube_url, lang: run.lang };
+    const proxyIndex = await takeProxyIndex(ctx.db, run.blocked_proxy_indexes ?? []);
+    await ctx.db.patch("runs", runId, {
+      token_hash: tokenHash,
+      proxy_index: proxyIndex ?? undefined,
+      updated_at: Date.now(),
+    });
+    return { youtube_url: run.youtube_url, lang: run.lang, proxy_index: proxyIndex };
   },
 });
 

@@ -26,7 +26,7 @@ export class FakeSandboxGateway implements SandboxGateway {
   }
 
   specFor(runId: string): SandboxSpec {
-    const spec = this.createdSpecs.find((createdSpec) => createdSpec.labels.run_id === runId);
+    const spec = this.createdSpecs.findLast((createdSpec) => createdSpec.labels.run_id === runId);
     if (spec === undefined) {
       throw new Error(`no sandbox was created for run ${runId}`);
     }

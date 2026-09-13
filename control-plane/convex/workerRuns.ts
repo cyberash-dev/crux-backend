@@ -6,7 +6,9 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import { finishRun } from "./model/runLifecycle";
+import { configuredProxyUrls } from "./config/proxyUrls";
+import { hasUntriedProxy } from "./model/proxyRotation";
+import { finishRun, provisionRunAgain } from "./model/runLifecycle";
 import {
   type ReportedFile,
   reportedFileValidator,
@@ -96,6 +98,13 @@ export const recordFailure = internalMutation({
     if (access.kind !== "granted") {
       return access.kind;
     }
+    if (error.code === "DOWNLOAD_BLOCKED") {
+      const blockedProxyIndexes = blockedProxyIndexesAfter(access.run);
+      if (hasUntriedProxy(blockedProxyIndexes, configuredProxyUrls().length)) {
+        await provisionRunAgain(ctx, access.run, blockedProxyIndexes);
+        return "applied";
+      }
+    }
     await finishRun(ctx, access.run, {
       status: "failed",
       error: { code: error.code, message: redactedText(error.message) },
@@ -103,6 +112,14 @@ export const recordFailure = internalMutation({
     return "applied";
   },
 });
+
+function blockedProxyIndexesAfter(run: Doc<"runs">): number[] {
+  const earlierIndexes = run.blocked_proxy_indexes ?? [];
+  if (run.proxy_index === undefined || earlierIndexes.includes(run.proxy_index)) {
+    return earlierIndexes;
+  }
+  return [...earlierIndexes, run.proxy_index];
+}
 
 function stagesAfter(
   stages: Doc<"runs">["stages"],

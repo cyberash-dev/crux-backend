@@ -25,6 +25,7 @@ export type FileKind = (typeof FILE_KINDS)[number];
 export const WORKER_ERROR_CODES = [
   "VIDEO_UNAVAILABLE",
   "DOWNLOAD_FAILED",
+  "DOWNLOAD_BLOCKED",
   "CONFIGURATION_ERROR",
   "PIPELINE_FAILED",
 ] as const;

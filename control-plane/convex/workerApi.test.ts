@@ -195,6 +195,24 @@ describe("POST /worker/runs/{run_id}/complete", () => {
   });
 
   /* @covers service:CON-002 */
+  /* @covers service:DLT-011 */
+  it("accepts a DOWNLOAD_BLOCKED failure and records it for a run whose only proxy was blocked", async () => {
+    const controlPlane = controlPlaneWithFakeClock();
+    const runId = await insertActiveRun(controlPlane, "token-a", "running");
+
+    const response = await postWorker(controlPlane, { runId, endpoint: "complete" }, "token-a", {
+      status: "failed",
+      error: { code: "DOWNLOAD_BLOCKED", message: "Sign in to confirm you're not a bot" },
+    });
+
+    expect(response.status).toBe(204);
+    expect(await runStatusOf(controlPlane, runId)).toMatchObject({
+      status: "failed",
+      error: { code: "DOWNLOAD_BLOCKED", message: "Sign in to confirm you're not a bot" },
+    });
+  });
+
+  /* @covers service:CON-002 */
   it.each([
     ["a missing result", { status: "succeeded", files: [] }],
     ["sections that are not objects", { status: "succeeded", files: [], result: { sections: ["s1"] } }],

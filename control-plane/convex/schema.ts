@@ -28,12 +28,20 @@ export default defineSchema({
     llm_spend_usd: v.optional(v.number()),
     token_hash: v.optional(v.string()),
     sandbox_id: v.optional(v.string()),
+    proxy_index: v.optional(v.number()),
+    blocked_proxy_indexes: v.optional(v.array(v.number())),
     last_event_at: v.number(),
     created_at: v.number(),
     updated_at: v.number(),
   })
     .index("by_status_and_created_at", ["status", "created_at"])
     .index("by_idempotency_key", ["idempotency_key"]),
+
+  /* One document counting the proxy turns taken by sandbox creations; a
+     turn modulo the PROXY_URL list length is the index of its proxy. */
+  proxy_rotation: defineTable({
+    turns_taken: v.number(),
+  }),
 
   /* Pipeline payloads are kept as JSON text: their shapes belong to the
      pipeline contracts, and Convex values restrict nested keys and depth. */

@@ -20,6 +20,7 @@ export async function insertActiveRun(
       stages: [],
       token_hash: tokenHash,
       sandbox_id: ARRANGED_SANDBOX_ID,
+      proxy_index: 0,
       last_event_at: now,
       created_at: now,
       updated_at: now,

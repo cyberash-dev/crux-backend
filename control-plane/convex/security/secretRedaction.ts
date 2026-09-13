@@ -1,3 +1,5 @@
+import { configuredProxyUrls } from "../config/proxyUrls";
+
 const SECRET_ENV_NAMES = [
   "DAYTONA_API_KEY",
   "PROXY_URL",
@@ -11,7 +13,7 @@ const REDACTION_MARK = "[redacted]";
 
 export function redactedText(text: string, extraSecrets: readonly string[] = []): string {
   const configuredSecrets = SECRET_ENV_NAMES.map((name) => process.env[name] ?? "");
-  return [...configuredSecrets, ...extraSecrets]
+  return [...configuredSecrets, ...configuredProxyUrls(), ...extraSecrets]
     .filter((secret) => secret.length > 0)
     .reduce((redacted, secret) => redacted.split(secret).join(REDACTION_MARK), text);
 }

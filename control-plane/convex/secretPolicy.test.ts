@@ -28,6 +28,8 @@ vi.mock("./sandbox/examinerGatewayFactory", () => ({ daytonaExaminerGateway: vi.
 
 const WATCH_URL = "https://www.youtube.com/watch?v=ZA-tUyM_y7s";
 const SECRET_ECHO = `proxy ${SENTINEL_SECRETS.PROXY_URL} rejected key ${SENTINEL_SECRETS.DAYTONA_API_KEY}`;
+const LISTED_PROXY_A = "http://listed-user-a:listed-pass-a@proxy-a.test:3128";
+const LISTED_PROXY_B = "http://listed-user-b:listed-pass-b@proxy-b.test:3128";
 
 describe("secrets stay in the control plane", () => {
   /* @covers service:POL-001 */
@@ -79,6 +81,51 @@ describe("secrets stay in the control plane", () => {
       code: "CONFIGURATION_ERROR",
       message: "bad token [redacted]",
     });
+  });
+
+  /* @covers service:POL-001 */
+  /* @covers service:DLT-009 */
+  it("serves a worker failure message that echoes each PROXY_URL entry with every entry redacted", async () => {
+    const controlPlane = controlPlaneWithFakeClock();
+    vi.stubEnv("PROXY_URL", `${LISTED_PROXY_A}, ${LISTED_PROXY_B}`);
+    const gateway = fakeGatewayInUse();
+    const runId = await submittedRunId(controlPlane, WATCH_URL);
+    await runScheduledFunctions(controlPlane);
+    await postWorker(controlPlane, { runId, endpoint: "complete" }, gateway.runToken(runId), {
+      status: "failed",
+      error: { code: "DOWNLOAD_FAILED", message: `via ${LISTED_PROXY_B} after ${LISTED_PROXY_A}` },
+    });
+
+    const response = await getRun(controlPlane, runId);
+
+    expect((await jsonObjectOf(response)).error).toEqual({
+      code: "DOWNLOAD_FAILED",
+      message: "via [redacted] after [redacted]",
+    });
+  });
+
+  /* @covers service:POL-001 */
+  /* @covers service:DLT-009 */
+  it("stores no PROXY_URL entry in any document after a blocked run is provisioned again", async () => {
+    const controlPlane = controlPlaneWithFakeClock();
+    vi.stubEnv("PROXY_URL", `${LISTED_PROXY_A},${LISTED_PROXY_B}`);
+    const gateway = fakeGatewayInUse();
+    const runId = await submittedRunId(controlPlane, WATCH_URL);
+    await runScheduledFunctions(controlPlane);
+    await postWorker(controlPlane, { runId, endpoint: "complete" }, gateway.runToken(runId), {
+      status: "failed",
+      error: { code: "DOWNLOAD_BLOCKED", message: `blocked via ${LISTED_PROXY_A}` },
+    });
+    await runScheduledFunctions(controlPlane);
+
+    const documentsText = JSON.stringify(
+      await controlPlane.run(async (ctx) => [
+        ...(await ctx.db.query("runs").collect()),
+        ...(await ctx.db.query("proxy_rotation").collect()),
+      ]),
+    );
+
+    expect([LISTED_PROXY_A, LISTED_PROXY_B].filter((proxyUrl) => documentsText.includes(proxyUrl))).toEqual([]);
   });
 
   /* @covers service:POL-001 */

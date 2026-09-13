@@ -1,5 +1,6 @@
 import type { Id } from "../_generated/dataModel";
 import { isEnvSet, MissingEnvError, requiredEnv } from "../config/env";
+import { configuredProxyUrls } from "../config/proxyUrls";
 import type { RunLang } from "../model/runVocabulary";
 import type { SandboxSpec } from "./sandboxGateway";
 
@@ -16,7 +17,7 @@ const WORKER_LAUNCH_ENV_NAMES = [
 export type WorkerLaunchConfig = {
   daytonaApiKey: string;
   snapshot: string;
-  proxyUrl: string;
+  proxyUrls: readonly string[];
   apiBase: string;
   claudeCodeOauthToken: string;
   elevenlabsApiKey: string;
@@ -28,6 +29,7 @@ export type WorkerLaunch = {
   runToken: string;
   youtubeUrl: string;
   lang: RunLang;
+  proxyIndex: number | null;
 };
 
 export function workerLaunchConfig(): WorkerLaunchConfig {
@@ -35,10 +37,14 @@ export function workerLaunchConfig(): WorkerLaunchConfig {
   if (missingNames.length > 0) {
     throw new MissingEnvError(missingNames);
   }
+  const proxyUrls = configuredProxyUrls();
+  if (proxyUrls.length === 0) {
+    throw new MissingEnvError(["PROXY_URL"]);
+  }
   return {
     daytonaApiKey: requiredEnv("DAYTONA_API_KEY"),
     snapshot: requiredEnv("WORKER_SNAPSHOT"),
-    proxyUrl: requiredEnv("PROXY_URL"),
+    proxyUrls,
     apiBase: requiredEnv("WORKER_API_BASE"),
     claudeCodeOauthToken: requiredEnv("CLAUDE_CODE_OAUTH_TOKEN"),
     elevenlabsApiKey: requiredEnv("ELEVENLABS_API_KEY"),
@@ -49,7 +55,7 @@ export function workerLaunchConfig(): WorkerLaunchConfig {
 export function sandboxSpec(config: WorkerLaunchConfig, launch: WorkerLaunch): SandboxSpec {
   return {
     snapshot: config.snapshot,
-    outboundProxyUrl: config.proxyUrl,
+    outboundProxyUrl: proxyUrlOfIndex(config.proxyUrls, launch.proxyIndex),
     labels: { run_id: launch.runId },
     envVars: {
       KONSPEKT_RUN_ID: launch.runId,
@@ -62,4 +68,12 @@ export function sandboxSpec(config: WorkerLaunchConfig, launch: WorkerLaunch): S
       EXA_API_KEY: config.exaApiKey,
     },
   };
+}
+
+function proxyUrlOfIndex(proxyUrls: readonly string[], proxyIndex: number | null): string {
+  const proxyUrl = proxyIndex === null ? undefined : proxyUrls[proxyIndex];
+  if (proxyUrl === undefined) {
+    throw new MissingEnvError(["PROXY_URL"]);
+  }
+  return proxyUrl;
 }

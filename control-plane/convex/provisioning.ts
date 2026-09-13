@@ -22,7 +22,13 @@ export const provisionRun = internalAction({
       return;
     }
     try {
-      await launchWorker(ctx, { runId, runToken, youtubeUrl: claim.youtube_url, lang: claim.lang });
+      await launchWorker(ctx, {
+        runId,
+        runToken,
+        youtubeUrl: claim.youtube_url,
+        lang: claim.lang,
+        proxyIndex: claim.proxy_index,
+      });
     } catch (error) {
       const message = redactedErrorMessage(error, [runToken]);
       console.error("sandbox.start_failed", { run_id: runId, message });
