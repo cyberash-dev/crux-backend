@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { CLOCK_START, runScheduledFunctions, SENTINEL_SECRETS } from "../test-support/controlPlane";
 import { FakeOperatorChat } from "../test-support/FakeOperatorChat";
+import { fakeGatewayInUse } from "../test-support/fakeGatewayInUse";
 import { postWorker } from "../test-support/httpCalls";
 import {
   HOUR_MS,
@@ -50,19 +51,37 @@ describe("proxy health", () => {
   });
 
   /* @covers service:REQ-005 */
-  it("sends one message naming the proxy index and port when an ok proxy turns blocked", async () => {
+  /* @covers service:DLT-013 */
+  it("sends one summary with the ok count and the blocked ports when a proxy turns blocked", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
     await probeAnswering(controlPlane, [okPage(), okPage(), okPage()]);
-    vi.advanceTimersByTime(HOUR_MS + 30 * 60 * 1000);
+    vi.advanceTimersByTime(HOUR_MS);
 
     await probeAnswering(controlPlane, [okPage(), okPage(), botCheckPage()]);
 
-    expect(chat.sentTexts).toEqual(["Proxy 3/3 (port 8003) is blocked by YouTube since 11:30 UTC"]);
+    expect(chat.sentTexts).toEqual(["Proxies: 2/3 OK. Blocked: port 8003."]);
   });
 
   /* @covers service:REQ-005 */
-  it("sends no message on the first observation of an ok proxy", async () => {
+  /* @covers service:DLT-013 */
+  it("sends one summary when one probe changes several proxies", async () => {
+    const chat = new FakeOperatorChat();
+    const controlPlane = proxyHealthControlPlane(chat);
+    await probeAnswering(controlPlane, [okPage(), botCheckPage(), okPage()]);
+    vi.advanceTimersByTime(HOUR_MS);
+
+    await probeAnswering(controlPlane, [botCheckPage(), okPage(), botCheckPage()]);
+
+    expect(chat.sentTexts).toEqual([
+      "Proxies: 2/3 OK. Blocked: port 8002.",
+      "Proxies: 1/3 OK. Blocked: port 8001, port 8003.",
+    ]);
+  });
+
+  /* @covers service:REQ-005 */
+  /* @covers service:DLT-013 */
+  it("sends no summary on the first observation of ok proxies", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
 
@@ -72,17 +91,19 @@ describe("proxy health", () => {
   });
 
   /* @covers service:REQ-005 */
-  it("reports the first observation of a blocked proxy as a change from ok", async () => {
+  /* @covers service:DLT-013 */
+  it("counts a proxy without a stored status as ok, so its first blocked check changes the set", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
 
     await probeAnswering(controlPlane, [okPage(), botCheckPage(), okPage()]);
 
-    expect(chat.sentTexts).toEqual(["Proxy 2/3 (port 8002) is blocked by YouTube since 10:00 UTC"]);
+    expect(chat.sentTexts).toEqual(["Proxies: 2/3 OK. Blocked: port 8002."]);
   });
 
   /* @covers service:REQ-005 */
-  it("reports a blocked check after only unknown checks as a change from ok", async () => {
+  /* @covers service:DLT-013 */
+  it("counts a proxy with only unknown checks as ok, so its first blocked check changes the set", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
     await probeAnswering(controlPlane, [networkError(), okPage(), okPage()]);
@@ -90,26 +111,41 @@ describe("proxy health", () => {
 
     await probeAnswering(controlPlane, [botCheckPage(), okPage(), okPage()]);
 
-    expect(chat.sentTexts).toEqual(["Proxy 1/3 (port 8001) is blocked by YouTube since 11:00 UTC"]);
+    expect(chat.sentTexts).toEqual(["Proxies: 2/3 OK. Blocked: port 8001."]);
   });
 
   /* @covers service:REQ-005 */
-  it("adds the every-proxy message when the first probe finds every proxy blocked", async () => {
+  /* @covers service:DLT-013 */
+  it("reads 0 of N with every port when the first probe finds every proxy blocked", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
 
     await probeAnswering(controlPlane, [botCheckPage(), botCheckPage(), botCheckPage()]);
 
     expect(chat.sentTexts).toEqual([
-      "Proxy 1/3 (port 8001) is blocked by YouTube since 10:00 UTC",
-      "Proxy 2/3 (port 8002) is blocked by YouTube since 10:00 UTC",
-      "Proxy 3/3 (port 8003) is blocked by YouTube since 10:00 UTC",
-      "All 3 proxies are blocked by YouTube; new runs fail with DOWNLOAD_BLOCKED",
+      "Proxies: 0/3 OK. Blocked: port 8001, port 8002, port 8003. New runs fail with DOWNLOAD_BLOCKED.",
     ]);
   });
 
   /* @covers service:REQ-005 */
-  it("sends one message when a blocked proxy turns ok again", async () => {
+  /* @covers service:DLT-013 */
+  it("reads 0 of N when the last ok proxy turns blocked", async () => {
+    const chat = new FakeOperatorChat();
+    const controlPlane = proxyHealthControlPlane(chat);
+    await probeAnswering(controlPlane, [botCheckPage(), botCheckPage(), okPage()]);
+    vi.advanceTimersByTime(HOUR_MS);
+
+    await probeAnswering(controlPlane, [botCheckPage(), botCheckPage(), botCheckPage()]);
+
+    expect(chat.sentTexts).toEqual([
+      "Proxies: 1/3 OK. Blocked: port 8001, port 8002.",
+      "Proxies: 0/3 OK. Blocked: port 8001, port 8002, port 8003. New runs fail with DOWNLOAD_BLOCKED.",
+    ]);
+  });
+
+  /* @covers service:REQ-005 */
+  /* @covers service:DLT-013 */
+  it("sends a summary without blocked ports when the last blocked proxy turns ok", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
     await probeAnswering(controlPlane, [botCheckPage(), okPage(), okPage()]);
@@ -117,14 +153,12 @@ describe("proxy health", () => {
 
     await probeAnswering(controlPlane, [okPage(), okPage(), okPage()]);
 
-    expect(chat.sentTexts).toEqual([
-      "Proxy 1/3 (port 8001) is blocked by YouTube since 10:00 UTC",
-      "Proxy 1/3 (port 8001) is OK again",
-    ]);
+    expect(chat.sentTexts).toEqual(["Proxies: 2/3 OK. Blocked: port 8001.", "Proxies: 3/3 OK."]);
   });
 
   /* @covers service:REQ-005 */
-  it("sends no message when hourly probes repeat the same statuses", async () => {
+  /* @covers service:DLT-013 */
+  it("sends no summary when hourly probes repeat the same blocked set", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
     await probeAnswering(controlPlane, [botCheckPage(), okPage(), okPage()]);
@@ -134,11 +168,12 @@ describe("proxy health", () => {
 
     await probeAnswering(controlPlane, [botCheckPage(), okPage(), okPage()]);
 
-    expect(chat.sentTexts).toEqual(["Proxy 1/3 (port 8001) is blocked by YouTube since 10:00 UTC"]);
+    expect(chat.sentTexts).toEqual(["Proxies: 2/3 OK. Blocked: port 8001."]);
   });
 
   /* @covers service:REQ-005 */
-  it("sends no message when an ok proxy is unknown for one probe and ok again", async () => {
+  /* @covers service:DLT-013 */
+  it("sends no summary when an ok proxy is unknown for one probe and ok again", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
     await probeAnswering(controlPlane, [okPage(), okPage(), okPage()]);
@@ -152,26 +187,11 @@ describe("proxy health", () => {
   });
 
   /* @covers service:REQ-005 */
-  it("adds the every-proxy message when the last ok proxy turns blocked", async () => {
+  /* @covers service:DLT-013 */
+  it("marks the proxy of a DOWNLOAD_BLOCKED completion blocked at once and sends the changed summary", async () => {
     const chat = new FakeOperatorChat();
     const controlPlane = proxyHealthControlPlane(chat);
-    await probeAnswering(controlPlane, [botCheckPage(), botCheckPage(), okPage()]);
-    vi.advanceTimersByTime(HOUR_MS);
-
-    await probeAnswering(controlPlane, [botCheckPage(), botCheckPage(), botCheckPage()]);
-
-    expect(chat.sentTexts).toEqual([
-      "Proxy 1/3 (port 8001) is blocked by YouTube since 10:00 UTC",
-      "Proxy 2/3 (port 8002) is blocked by YouTube since 10:00 UTC",
-      "Proxy 3/3 (port 8003) is blocked by YouTube since 11:00 UTC",
-      "All 3 proxies are blocked by YouTube; new runs fail with DOWNLOAD_BLOCKED",
-    ]);
-  });
-
-  /* @covers service:REQ-005 */
-  it("marks the proxy of a DOWNLOAD_BLOCKED completion blocked at once and reports the change", async () => {
-    const chat = new FakeOperatorChat();
-    const controlPlane = proxyHealthControlPlane(chat);
+    fakeGatewayInUse();
     await probeAnswering(controlPlane, [okPage(), okPage(), okPage()]);
     vi.advanceTimersByTime(10 * 60 * 1000);
     const runId = await insertActiveRun(controlPlane, RUN_TOKEN, "running");
@@ -190,7 +210,7 @@ describe("proxy health", () => {
         checked_at: START + 10 * 60 * 1000,
         last_known_status: "blocked",
       },
-      sentTexts: ["Proxy 1/3 (port 8001) is blocked by YouTube since 10:10 UTC"],
+      sentTexts: ["Proxies: 2/3 OK. Blocked: port 8001."],
     });
   });
 

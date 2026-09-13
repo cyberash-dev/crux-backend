@@ -10,6 +10,7 @@
 
 import type * as clientApi from "../clientApi.js";
 import type * as config_env from "../config/env.js";
+import type * as config_maxParallelRuns from "../config/maxParallelRuns.js";
 import type * as config_proxyUrls from "../config/proxyUrls.js";
 import type * as crons from "../crons.js";
 import type * as dispatcher from "../dispatcher.js";
@@ -42,6 +43,8 @@ import type * as model_proxyHealthVocabulary from "../model/proxyHealthVocabular
 import type * as model_proxyRotation from "../model/proxyRotation.js";
 import type * as model_runLifecycle from "../model/runLifecycle.js";
 import type * as model_runLookup from "../model/runLookup.js";
+import type * as model_runNotices from "../model/runNotices.js";
+import type * as model_runQueue from "../model/runQueue.js";
 import type * as model_runStatusView from "../model/runStatusView.js";
 import type * as model_runValidators from "../model/runValidators.js";
 import type * as model_runVocabulary from "../model/runVocabulary.js";
@@ -51,6 +54,7 @@ import type * as operatorChat_operatorChat from "../operatorChat/operatorChat.js
 import type * as operatorChat_operatorChatFactory from "../operatorChat/operatorChatFactory.js";
 import type * as operatorChat_telegramOperatorChat from "../operatorChat/telegramOperatorChat.js";
 import type * as operatorChat_telegramSendError from "../operatorChat/telegramSendError.js";
+import type * as operatorNotices from "../operatorNotices.js";
 import type * as provisioning from "../provisioning.js";
 import type * as proxyHealth from "../proxyHealth.js";
 import type * as proxyProbe from "../proxyProbe.js";
@@ -89,6 +93,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   clientApi: typeof clientApi;
   "config/env": typeof config_env;
+  "config/maxParallelRuns": typeof config_maxParallelRuns;
   "config/proxyUrls": typeof config_proxyUrls;
   crons: typeof crons;
   dispatcher: typeof dispatcher;
@@ -121,6 +126,8 @@ declare const fullApi: ApiFromModules<{
   "model/proxyRotation": typeof model_proxyRotation;
   "model/runLifecycle": typeof model_runLifecycle;
   "model/runLookup": typeof model_runLookup;
+  "model/runNotices": typeof model_runNotices;
+  "model/runQueue": typeof model_runQueue;
   "model/runStatusView": typeof model_runStatusView;
   "model/runValidators": typeof model_runValidators;
   "model/runVocabulary": typeof model_runVocabulary;
@@ -130,6 +137,7 @@ declare const fullApi: ApiFromModules<{
   "operatorChat/operatorChatFactory": typeof operatorChat_operatorChatFactory;
   "operatorChat/telegramOperatorChat": typeof operatorChat_telegramOperatorChat;
   "operatorChat/telegramSendError": typeof operatorChat_telegramSendError;
+  operatorNotices: typeof operatorNotices;
   provisioning: typeof provisioning;
   proxyHealth: typeof proxyHealth;
   proxyProbe: typeof proxyProbe;

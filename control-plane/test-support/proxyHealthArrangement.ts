@@ -1,18 +1,17 @@
 import { vi } from "vitest";
 import { internal } from "../convex/_generated/api";
 import type { Doc } from "../convex/_generated/dataModel";
-import { telegramOperatorChat } from "../convex/operatorChat/operatorChatFactory";
 import { proxiedWatchPageClient } from "../convex/watchPage/watchPageClientFactory";
 import { type ControlPlane, controlPlaneWithFakeClock, runScheduledFunctions } from "./controlPlane";
 import { FakeOperatorChat } from "./FakeOperatorChat";
 import { FakeWatchPageClient, type WatchPageAnswer } from "./FakeWatchPageClient";
+import { operatorChatInUse } from "./operatorChatArrangement";
 
 export const HEALTH_PROXY_URLS = [
   "http://health-user-a:health-pass-a@disp.proxy.test:8001",
   "http://health-user-b:health-pass-b@disp.proxy.test:8002",
   "http://health-user-c:health-pass-c@disp.proxy.test:8003",
 ] as const;
-export const TELEGRAM_CHAT_ID = "-100200300";
 export const HOUR_MS = 60 * 60 * 1000;
 
 type StoredProxyHealth = Omit<Doc<"proxy_health">, "_id" | "_creationTime">;
@@ -22,8 +21,7 @@ type StoredProxyHealth = Omit<Doc<"proxy_health">, "_id" | "_creationTime">;
 export function proxyHealthControlPlane(chat: FakeOperatorChat = new FakeOperatorChat()): ControlPlane {
   const controlPlane = controlPlaneWithFakeClock();
   vi.stubEnv("PROXY_URL", HEALTH_PROXY_URLS.join(","));
-  vi.stubEnv("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID);
-  vi.mocked(telegramOperatorChat).mockReturnValue(chat);
+  operatorChatInUse(chat);
   return controlPlane;
 }
 

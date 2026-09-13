@@ -1,10 +1,8 @@
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { type DatabaseReader, internalMutation, type MutationCtx } from "./_generated/server";
+import { configuredMaxParallelRuns } from "./config/maxParallelRuns";
 import { ACTIVE_RUN_STATUSES } from "./model/runVocabulary";
-
-const DEFAULT_MAX_PARALLEL_RUNS = 1;
-const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
 
 export const dispatch = internalMutation({
   args: {},
@@ -21,17 +19,6 @@ export const dispatch = internalMutation({
     }
   },
 });
-
-function configuredMaxParallelRuns(): number {
-  const configured = process.env.MAX_PARALLEL_RUNS;
-  if (configured === undefined || configured === "") {
-    return DEFAULT_MAX_PARALLEL_RUNS;
-  }
-  if (!POSITIVE_INTEGER.test(configured)) {
-    throw new Error("MAX_PARALLEL_RUNS must be a positive integer");
-  }
-  return Number(configured);
-}
 
 async function boundedActiveRunCount(db: DatabaseReader, bound: number): Promise<number> {
   const activeRunsByStatus = await Promise.all(

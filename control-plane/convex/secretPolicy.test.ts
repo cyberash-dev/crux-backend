@@ -293,7 +293,7 @@ describe("proxy health keeps proxy URLs and the bot token out", () => {
     await probeAnswering(controlPlane, [botCheckPage(), okPage(), botCheckPage()]);
 
     expect({ sentCount: chat.sentTexts.length, secrets: proxyHealthSecretsIn(chat.sentTexts.join("\n")) }).toEqual({
-      sentCount: 4,
+      sentCount: 2,
       secrets: [],
     });
   });

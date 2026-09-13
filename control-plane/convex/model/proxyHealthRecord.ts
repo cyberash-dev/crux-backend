@@ -2,7 +2,7 @@ import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import type { DatabaseReader, DatabaseWriter, MutationCtx } from "../_generated/server";
 import { configuredProxyUrls } from "../config/proxyUrls";
-import { everyProxyBlockedNotice, proxyStatusNotice } from "./proxyHealthNotices";
+import { proxySummaryNotice } from "./proxyHealthNotices";
 import type { KnownProxyHealthStatus, ProxyCheck } from "./proxyHealthVocabulary";
 
 type ProxyHealth = Doc<"proxy_health">;
@@ -13,33 +13,21 @@ type ProxyHealthFields = Omit<ProxyHealth, "_id" | "_creationTime">;
 export async function recordProxyChecks(ctx: MutationCtx, checks: readonly ProxyCheck[]): Promise<void> {
   const now = Date.now();
   const proxyUrls = configuredProxyUrls();
-  const notices: string[] = [];
-  let hasProxyTurnedBlocked = false;
-  for (const check of checks) {
-    const proxyUrl = proxyUrls[check.proxy_index];
-    if (proxyUrl === undefined) {
-      continue;
-    }
-    const change = await storedStatusChange(ctx.db, check, now);
-    if (change !== null) {
-      const position = { proxyIndex: check.proxy_index, proxyCount: proxyUrls.length, proxyUrl };
-      notices.push(proxyStatusNotice(position, change, now));
-      hasProxyTurnedBlocked ||= change === "blocked";
-    }
+  const blockedIndexesBefore = await blockedProxyIndexes(ctx.db, proxyUrls.length);
+  for (const check of checks.filter((listedCheck) => listedCheck.proxy_index < proxyUrls.length)) {
+    await storeProxyCheck(ctx.db, check, now);
   }
-  if (hasProxyTurnedBlocked && !(await hasOkProxy(ctx.db, proxyUrls.length))) {
-    notices.push(everyProxyBlockedNotice(proxyUrls.length));
+  const blockedIndexesAfter = await blockedProxyIndexes(ctx.db, proxyUrls.length);
+  if (blockedIndexesAfter.join(",") === blockedIndexesBefore.join(",")) {
+    return;
   }
-  if (notices.length > 0) {
-    await ctx.scheduler.runAfter(0, internal.proxyHealth.sendNotices, { texts: notices });
-  }
+  const blockedProxyUrls = proxyUrls.filter((_, proxyIndex) => blockedIndexesAfter.includes(proxyIndex));
+  await ctx.scheduler.runAfter(0, internal.operatorNotices.sendTexts, {
+    texts: [proxySummaryNotice(proxyUrls.length, blockedProxyUrls)],
+  });
 }
 
-async function storedStatusChange(
-  db: DatabaseWriter,
-  check: ProxyCheck,
-  now: number,
-): Promise<KnownProxyHealthStatus | null> {
+async function storeProxyCheck(db: DatabaseWriter, check: ProxyCheck, now: number): Promise<void> {
   const previous = await db
     .query("proxy_health")
     .withIndex("by_proxy_index", (q) => q.eq("proxy_index", check.proxy_index))
@@ -50,13 +38,6 @@ async function storedStatusChange(
   } else {
     await db.replace("proxy_health", previous._id, health);
   }
-  return check.status !== "unknown" && check.status !== statusForChangeCheck(previous) ? check.status : null;
-}
-
-/* A proxy never seen ok or blocked is presumed ok, so its first blocked
-   check is reported as a change and its first ok check is not. */
-function statusForChangeCheck(health: ProxyHealth | null | undefined): KnownProxyHealthStatus {
-  return health?.last_known_status ?? "ok";
 }
 
 function healthAfter(previous: ProxyHealth | null, check: ProxyCheck, now: number): ProxyHealthFields {
@@ -70,10 +51,15 @@ function healthAfter(previous: ProxyHealth | null, check: ProxyCheck, now: numbe
   };
 }
 
-async function hasOkProxy(db: DatabaseReader, proxyCount: number): Promise<boolean> {
+async function blockedProxyIndexes(db: DatabaseReader, proxyCount: number): Promise<number[]> {
   const healths = await db.query("proxy_health").collect();
-  return Array.from({ length: proxyCount }, (_, proxyIndex) => proxyIndex).some(
+  return Array.from({ length: proxyCount }, (_, proxyIndex) => proxyIndex).filter(
     (proxyIndex) =>
-      statusForChangeCheck(healths.find((health) => health.proxy_index === proxyIndex)) === "ok",
+      statusForChangeCheck(healths.find((health) => health.proxy_index === proxyIndex)) === "blocked",
   );
+}
+
+/* A proxy never seen ok or blocked counts as ok. */
+function statusForChangeCheck(health: ProxyHealth | undefined): KnownProxyHealthStatus {
+  return health?.last_known_status ?? "ok";
 }

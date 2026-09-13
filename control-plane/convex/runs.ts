@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { runByIdText } from "./model/runLookup";
+import { activeRunCount, queuedRunCountBefore } from "./model/runQueue";
 import { runStatusView, type RunStatusView } from "./model/runStatusView";
 import { runLangValidator } from "./model/runValidators";
 import { type StoredRunResult, storedRunResult } from "./model/storedRunResult";
@@ -43,6 +44,13 @@ export const createRun = internalMutation({
       updated_at: now,
     });
     await ctx.scheduler.runAfter(0, internal.dispatcher.dispatch, {});
+    await ctx.scheduler.runAfter(0, internal.operatorNotices.sendRunSubmitted, {
+      run_id: runId,
+      youtube_url: args.youtube_url,
+      ...(args.external_ref === undefined ? {} : { external_ref: args.external_ref }),
+      queued_ahead: await queuedRunCountBefore(ctx.db, runId, now),
+      active_runs: await activeRunCount(ctx.db),
+    });
     return { run_id: runId, video_id: args.video_id };
   },
 });
