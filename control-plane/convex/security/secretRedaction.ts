@@ -7,6 +7,7 @@ const SECRET_ENV_NAMES = [
   "ELEVENLABS_API_KEY",
   "EXA_API_KEY",
   "SERVICE_API_KEY",
+  "TELEGRAM_BOT_TOKEN",
 ] as const;
 
 const REDACTION_MARK = "[redacted]";

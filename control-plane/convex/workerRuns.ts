@@ -7,6 +7,7 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { configuredProxyUrls } from "./config/proxyUrls";
+import { recordProxyChecks } from "./model/proxyHealthRecord";
 import { hasUntriedProxy } from "./model/proxyRotation";
 import { finishRun, provisionRunAgain } from "./model/runLifecycle";
 import {
@@ -99,6 +100,9 @@ export const recordFailure = internalMutation({
       return access.kind;
     }
     if (error.code === "DOWNLOAD_BLOCKED") {
+      if (access.run.proxy_index !== undefined) {
+        await recordProxyChecks(ctx, [{ proxy_index: access.run.proxy_index, status: "blocked" }]);
+      }
       const blockedProxyIndexes = blockedProxyIndexesAfter(access.run);
       if (hasUntriedProxy(blockedProxyIndexes, configuredProxyUrls().length)) {
         await provisionRunAgain(ctx, access.run, blockedProxyIndexes);

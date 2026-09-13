@@ -6,6 +6,7 @@ import {
   messageRoleValidator,
   verdictValidator,
 } from "./model/examValidators";
+import { knownProxyHealthStatusValidator, proxyHealthStatusValidator } from "./model/proxyHealthVocabulary";
 import {
   completedStageValidator,
   fileKindValidator,
@@ -42,6 +43,17 @@ export default defineSchema({
   proxy_rotation: defineTable({
     turns_taken: v.number(),
   }),
+
+  /* status is the latest check, since is when that status began, and
+     last_known_status is the latest ok or blocked check: an unknown check
+     keeps it, so status changes are detected between ok and blocked only. */
+  proxy_health: defineTable({
+    proxy_index: v.number(),
+    status: proxyHealthStatusValidator,
+    since: v.number(),
+    checked_at: v.number(),
+    last_known_status: v.optional(knownProxyHealthStatusValidator),
+  }).index("by_proxy_index", ["proxy_index"]),
 
   /* Pipeline payloads are kept as JSON text: their shapes belong to the
      pipeline contracts, and Convex values restrict nested keys and depth. */

@@ -12,6 +12,7 @@ export const SENTINEL_SECRETS = {
   ELEVENLABS_API_KEY: "sentinel-elevenlabs-key-44d0",
   EXA_API_KEY: "sentinel-exa-key-0b8e",
   SERVICE_API_KEY: "sentinel-service-key-c61d",
+  TELEGRAM_BOT_TOKEN: "123456789:sentinel-telegram-bot-token-5e7b",
 } as const;
 
 export const WORKER_SNAPSHOT = "konspekt-worker-test-snapshot";
@@ -26,6 +27,7 @@ export function controlPlaneWithFakeClock(): ControlPlane {
   }
   vi.stubEnv("WORKER_SNAPSHOT", WORKER_SNAPSHOT);
   vi.stubEnv("WORKER_API_BASE", WORKER_API_BASE);
+  vi.stubEnv("TELEGRAM_CHAT_ID", "");
   return convexTest(schema, modules);
 }
 

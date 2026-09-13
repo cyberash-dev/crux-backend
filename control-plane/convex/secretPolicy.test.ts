@@ -21,10 +21,20 @@ import {
 } from "../test-support/examCalls";
 import { fakeGatewayInUse } from "../test-support/fakeGatewayInUse";
 import { getRun, jsonObjectOf, postWorker, submittedRunId } from "../test-support/httpCalls";
-import { storedFileId, succeededCompletion } from "../test-support/runArrangement";
+import { FakeOperatorChat } from "../test-support/FakeOperatorChat";
+import {
+  HEALTH_PROXY_URLS,
+  HOUR_MS,
+  probeAnswering,
+  proxyHealthControlPlane,
+} from "../test-support/proxyHealthArrangement";
+import { insertActiveRun, storedFileId, succeededCompletion } from "../test-support/runArrangement";
+import { botCheckPage, networkError, okPage } from "../test-support/watchPageFixtures";
 
 vi.mock("./sandbox/daytonaGatewayFactory", () => ({ daytonaSandboxGateway: vi.fn() }));
 vi.mock("./sandbox/examinerGatewayFactory", () => ({ daytonaExaminerGateway: vi.fn() }));
+vi.mock("./watchPage/watchPageClientFactory", () => ({ proxiedWatchPageClient: vi.fn() }));
+vi.mock("./operatorChat/operatorChatFactory", () => ({ telegramOperatorChat: vi.fn() }));
 
 const WATCH_URL = "https://www.youtube.com/watch?v=ZA-tUyM_y7s";
 const SECRET_ECHO = `proxy ${SENTINEL_SECRETS.PROXY_URL} rejected key ${SENTINEL_SECRETS.DAYTONA_API_KEY}`;
@@ -254,3 +264,71 @@ describe("exam secrets stay in the control plane", () => {
     ]);
   });
 });
+
+/* @covers service:DLT-012 */
+describe("proxy health keeps proxy URLs and the bot token out", () => {
+  /* @covers service:POL-001 */
+  it("stores no proxy URL or bot token in any proxy health document", async () => {
+    const controlPlane = proxyHealthControlPlane();
+    await probeAnswering(controlPlane, [okPage(), okPage(), okPage()]);
+    const runId = await insertActiveRun(controlPlane, "health-run-token", "running");
+    await postWorker(controlPlane, { runId, endpoint: "complete" }, "health-run-token", {
+      status: "failed",
+      error: { code: "DOWNLOAD_BLOCKED", message: `blocked via ${HEALTH_PROXY_URLS[0]}` },
+    });
+    await probeAnswering(controlPlane, [botCheckPage(), botCheckPage(), networkError()]);
+
+    const documentsText = JSON.stringify(await controlPlane.run(async (ctx) => ctx.db.query("proxy_health").collect()));
+
+    expect(proxyHealthSecretsIn(documentsText)).toEqual([]);
+  });
+
+  /* @covers service:POL-001 */
+  it("sends Telegram messages without any proxy URL or the bot token", async () => {
+    const chat = new FakeOperatorChat();
+    const controlPlane = proxyHealthControlPlane(chat);
+    await probeAnswering(controlPlane, [okPage(), botCheckPage(), okPage()]);
+    vi.advanceTimersByTime(HOUR_MS);
+
+    await probeAnswering(controlPlane, [botCheckPage(), okPage(), botCheckPage()]);
+
+    expect({ sentCount: chat.sentTexts.length, secrets: proxyHealthSecretsIn(chat.sentTexts.join("\n")) }).toEqual({
+      sentCount: 4,
+      secrets: [],
+    });
+  });
+
+  /* @covers service:POL-001 */
+  it("logs a probe network error that echoes the proxy URL with the URL redacted", async () => {
+    const controlPlane = proxyHealthControlPlane();
+    const warningLog = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await probeAnswering(controlPlane, [
+      okPage(),
+      networkError(`tunnel to ${HEALTH_PROXY_URLS[1]} refused`),
+      okPage(),
+    ]);
+
+    expect(warningLog.mock.calls).toEqual([
+      ["proxy_probe.unknown", { proxy_index: 1, detail: "tunnel to [redacted] refused" }],
+    ]);
+  });
+
+  /* @covers service:POL-001 */
+  it("gives the worker sandbox no Telegram bot token", async () => {
+    const controlPlane = controlPlaneWithFakeClock();
+    const gateway = fakeGatewayInUse();
+    await submittedRunId(controlPlane, WATCH_URL);
+
+    await runScheduledFunctions(controlPlane);
+
+    expect(JSON.stringify(gateway.createdSpecs)).not.toContain(SENTINEL_SECRETS.TELEGRAM_BOT_TOKEN);
+  });
+});
+
+function proxyHealthSecretsIn(text: string): string[] {
+  const proxyCredentials = HEALTH_PROXY_URLS.map((proxyUrl) => new URL(proxyUrl).password);
+  return [...HEALTH_PROXY_URLS, ...proxyCredentials, SENTINEL_SECRETS.TELEGRAM_BOT_TOKEN].filter((secret) =>
+    text.includes(secret),
+  );
+}
