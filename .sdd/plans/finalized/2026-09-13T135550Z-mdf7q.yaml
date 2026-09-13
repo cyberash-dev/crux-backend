@@ -1,0 +1,10 @@
+plan_id: 2026-09-13T135550Z-mdf7q
+created_at: 2026-09-13T13:55:50.052Z
+pending_attestations:
+  - id: service:DLT-007
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T13:55:50.051Z
+    change_request: "sandbox resources sized to the Daytona quota for two parallel runs (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)"
+    scope: first-time-approval
+    target_status: approved

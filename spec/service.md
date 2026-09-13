@@ -1433,6 +1433,41 @@ tests_new_behavior:
 ---
 ```
 
+```yaml
+---
+id: service:DLT-007
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T13:55:50.051Z
+    change_request: sandbox resources sized to the Daytona quota for two parallel runs (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+target_id: service:ASM-002
+kind: replace
+compatibility_action: ignore
+baseline_version: 92dc11e
+summary: |
+  The capacity assumption is corrected against the measured Daytona
+  quota (10 vCPU, 10 GiB memory, 30 GiB disk): a run sandbox with 8 GiB
+  left room for one examiner sandbox only. Run sandboxes shrink to
+  4 vCPU, 4 GiB (the measured peak of a 46-minute lecture was about
+  2 GiB) and examiner sandboxes to 1 vCPU, 1 GiB, 3 GiB, so two runs
+  (MAX_PARALLEL_RUNS 2) and two exam sessions fit at once.
+tests_old_behavior:
+  - not_applicable: capacity assumption with no runtime behavior
+tests_new_behavior:
+  - not_applicable: capacity assumption with no runtime behavior
+test_obligation:
+  not_applicable: capacity_assumption_only
+  reason: the delta resizes sandboxes and a deployment setting; no code
+    path changes, the capacity is checked by the live parallel-run check
+---
+```
+
 ## 16. Implementation bindings
 
 None.
@@ -1485,10 +1520,12 @@ partition_id: service
 assumption: |
   Pitch-demo scope for exam sessions: the service stores no student
   identity and the client maps exam ids to its users; exam messages are
-  kept without a retention limit like run results; the Daytona
-  organization quota holds the concurrent examiner sandboxes (1 vCPU,
-  2 GiB each) next to the run sandbox, so concurrent exam sessions are
-  not capped.
+  kept without a retention limit like run results. The Daytona
+  organization quota (10 vCPU, 10 GiB memory, 30 GiB disk) holds two run
+  sandboxes (4 vCPU, 4 GiB, 10 GiB each, MAX_PARALLEL_RUNS 2) plus two
+  examiner sandboxes (1 vCPU, 1 GiB, 3 GiB each); concurrent exam
+  sessions are not capped, so an exam opened beyond that capacity fails
+  with EXAMINER_FAILED.
 blocking: no
 review_by: 2026-10-15
 default_if_unresolved: keep_assumption
