@@ -1,0 +1,2 @@
+class DownloadBlockedError(Exception):
+    pass

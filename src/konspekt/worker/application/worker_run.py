@@ -16,6 +16,7 @@ from konspekt.worker.domain.stored_file import StoredFile
 from konspekt.worker.domain.video_metadata import VideoMetadata
 from konspekt.worker.ports.outbound.build_runner import BuildRunnerPort
 from konspekt.worker.ports.outbound.clock import ClockPort
+from konspekt.worker.ports.outbound.download_blocked_error import DownloadBlockedError
 from konspekt.worker.ports.outbound.download_failed_error import DownloadFailedError
 from konspekt.worker.ports.outbound.running_job import RunningJobPort
 from konspekt.worker.ports.outbound.video_source import VideoSourcePort
@@ -27,6 +28,7 @@ _DOWNLOAD_STAGE = "download"
 _POLL_INTERVAL_SECONDS = 10.0
 _HEARTBEAT_INTERVAL_SECONDS = 30.0
 _OUT_DIR_NAME = "out"
+_DOWNLOAD_BLOCKED_MESSAGE = "YouTube blocked the download with a bot check"
 
 _logger = logging.getLogger(__name__)
 
@@ -76,6 +78,8 @@ class WorkerRun:
             video = self._video_source.metadata(self._request.youtube_url)
         except VideoUnavailableError as error:
             raise _RunFailure(FailureCode.VIDEO_UNAVAILABLE, str(error)) from error
+        except DownloadBlockedError as error:
+            raise _RunFailure(FailureCode.DOWNLOAD_BLOCKED, _DOWNLOAD_BLOCKED_MESSAGE) from error
         rejection_reason = video.rejection_reason()
         if rejection_reason is not None:
             raise _RunFailure(FailureCode.VIDEO_UNAVAILABLE, rejection_reason)
@@ -89,6 +93,8 @@ class WorkerRun:
             return self._awaited_outcome(download, self._send_heartbeat_if_due)
         except DownloadFailedError as error:
             raise _RunFailure(FailureCode.DOWNLOAD_FAILED, str(error)) from error
+        except DownloadBlockedError as error:
+            raise _RunFailure(FailureCode.DOWNLOAD_BLOCKED, _DOWNLOAD_BLOCKED_MESSAGE) from error
 
     def _successful_build(self, video_path: Path, slug: str) -> BuildOutcome:
         stage_store = ArtifactStore(self._out_dir / slug / "work")

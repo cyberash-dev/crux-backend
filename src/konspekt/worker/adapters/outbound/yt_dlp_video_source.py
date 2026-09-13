@@ -5,6 +5,7 @@ from pathlib import Path
 
 from konspekt.worker.adapters.outbound.process_output import error_tail
 from konspekt.worker.domain.video_metadata import VideoMetadata
+from konspekt.worker.ports.outbound.download_blocked_error import DownloadBlockedError
 from konspekt.worker.ports.outbound.download_failed_error import DownloadFailedError
 from konspekt.worker.ports.outbound.running_job import RunningJobPort
 from konspekt.worker.ports.outbound.video_unavailable_error import VideoUnavailableError
@@ -15,6 +16,7 @@ _VIDEO_FORMAT = (
 _MERGED_EXTENSION = "mkv"
 _DOWNLOAD_LOG_NAME = "yt-dlp-download.log"
 _VIDEO_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
+_BOT_CHECK_PATTERN = re.compile(r"confirm\s+you['’]re\s+not\s+a\s+bot", re.IGNORECASE)
 
 
 class YtDlpVideoSource:
@@ -31,6 +33,8 @@ class YtDlpVideoSource:
             errors="replace",
         )
         if completed.returncode != 0:
+            if _has_bot_check(completed.stderr):
+                raise DownloadBlockedError(error_tail(completed.stderr))
             raise VideoUnavailableError(
                 error_tail(completed.stderr) or f"yt-dlp exited with code {completed.returncode}"
             )
@@ -82,6 +86,8 @@ class _RunningDownload:
             return None
         if exit_code != 0:
             stderr = self._log_path.read_text(encoding="utf-8", errors="replace")
+            if _has_bot_check(stderr):
+                raise DownloadBlockedError(error_tail(stderr))
             raise DownloadFailedError(error_tail(stderr) or f"yt-dlp exited with code {exit_code}")
         if not self._video_path.is_file():
             raise DownloadFailedError(f"yt-dlp finished without writing {self._video_path.name}")
@@ -90,6 +96,10 @@ class _RunningDownload:
     def terminate(self) -> None:
         self._process.terminate()
         self._process.wait()
+
+
+def _has_bot_check(stderr: str) -> bool:
+    return _BOT_CHECK_PATTERN.search(stderr) is not None
 
 
 def _video_metadata(raw_json: str) -> VideoMetadata:

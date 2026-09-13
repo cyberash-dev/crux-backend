@@ -15,6 +15,7 @@ from konspekt.worker.domain.failure_code import FailureCode
 from konspekt.worker.domain.secret_values import SecretValues
 from konspekt.worker.domain.stored_file import StoredFile
 from konspekt.worker.domain.video_metadata import VideoMetadata
+from konspekt.worker.ports.outbound.download_blocked_error import DownloadBlockedError
 from konspekt.worker.ports.outbound.video_unavailable_error import VideoUnavailableError
 from konspekt.worker.ports.outbound.worker_api import WorkerApiPort
 from konspekt.worker.ports.outbound.worker_api_error import WorkerApiError
@@ -31,6 +32,8 @@ PUBLIC_VIDEO = VideoMetadata(
     availability="public",
 )
 SUCCESSFUL_BUILD = BuildOutcome(exit_code=0, llm_spend_usd=3.5, stderr_tail="")
+
+MetadataOutcome = VideoMetadata | VideoUnavailableError | DownloadBlockedError
 
 
 class FakeClock:
@@ -151,7 +154,7 @@ class DownloadRequest:
 
 class FakeVideoSource:
     def __init__(
-        self, metadata: VideoMetadata | VideoUnavailableError, download: FakeRunningJob[Path]
+        self, metadata: MetadataOutcome, download: FakeRunningJob[Path]
     ) -> None:
         self._metadata = metadata
         self._download = download
@@ -160,7 +163,7 @@ class FakeVideoSource:
 
     def metadata(self, youtube_url: str) -> VideoMetadata:
         self.metadata_requests.append(youtube_url)
-        if isinstance(self._metadata, VideoUnavailableError):
+        if isinstance(self._metadata, VideoUnavailableError | DownloadBlockedError):
             raise self._metadata
         return self._metadata
 
@@ -204,7 +207,7 @@ def a_finished_download(work_dir: Path, polls: int = 3) -> FakeRunningJob[Path]:
 
 
 def a_video_source(
-    work_dir: Path, video: VideoMetadata | VideoUnavailableError = PUBLIC_VIDEO
+    work_dir: Path, video: MetadataOutcome = PUBLIC_VIDEO
 ) -> FakeVideoSource:
     return FakeVideoSource(video, a_finished_download(work_dir))
 

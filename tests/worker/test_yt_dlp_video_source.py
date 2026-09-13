@@ -6,6 +6,7 @@ import pytest
 
 from konspekt.worker.adapters.outbound.yt_dlp_video_source import YtDlpVideoSource
 from konspekt.worker.domain.video_metadata import VideoMetadata
+from konspekt.worker.ports.outbound.download_blocked_error import DownloadBlockedError
 from konspekt.worker.ports.outbound.download_failed_error import DownloadFailedError
 from konspekt.worker.ports.outbound.video_unavailable_error import VideoUnavailableError
 from tests.worker.stub_processes import (
@@ -16,6 +17,16 @@ from tests.worker.stub_processes import (
 
 VIDEO_URL = "https://www.youtube.com/watch?v=HtSuA80QTyo"
 PROXY_URL = "http://proxy-user:proxy-pass@proxy.example:8080"
+BOT_CHECK_STDERR = (
+    "WARNING: [youtube] No title found in player responses; falling back to title from"
+    " initial data. Other metadata may also be missing\n"
+    "ERROR: [youtube] KM4Xe6Dlp0Y: Sign in to confirm you\u2019re not a bot. Use"
+    " --cookies-from-browser or --cookies for the authentication. See "
+    " https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how"
+    " to manually pass cookies. Also see "
+    " https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips"
+    " on effectively exporting YouTube cookies\n"
+)
 
 
 def a_metadata_fixture(**overrides: object) -> dict[str, object]:
@@ -131,6 +142,7 @@ def test_live_upcoming_or_private_fixture_is_rejected(
     assert video.rejection_reason() == reason
 
 
+# @covers service:DLT-008
 def test_failed_metadata_command_raises_video_unavailable_with_its_stderr(tmp_path: Path) -> None:
     source = YtDlpVideoSource(
         proxy_url=PROXY_URL,
@@ -234,6 +246,7 @@ def test_running_download_has_no_outcome_yet(tmp_path: Path) -> None:
     assert outcome_while_running is None
 
 
+# @covers service:DLT-008
 def test_failed_download_raises_download_failed_with_its_stderr(tmp_path: Path) -> None:
     source = YtDlpVideoSource(
         proxy_url=PROXY_URL,
@@ -256,4 +269,56 @@ def test_download_without_the_merged_file_raises_download_failed(tmp_path: Path)
     download = source.download(VIDEO_URL, "HtSuA80QTyo", tmp_path)
 
     with pytest.raises(DownloadFailedError, match="without writing HtSuA80QTyo.mkv"):
+        an_outcome_after_exit(download)
+
+
+def a_failing_yt_dlp(tmp_path: Path, stderr: str) -> str:
+    stderr_path = tmp_path / "stderr.txt"
+    stderr_path.write_text(stderr, encoding="utf-8")
+    return a_stub_executable(tmp_path, "yt-dlp", f'cat "{stderr_path}" >&2\nexit 1\n')
+
+
+# @covers service:DLT-008
+@pytest.mark.parametrize(
+    "stderr",
+    [
+        pytest.param(BOT_CHECK_STDERR, id="curly-apostrophe"),
+        pytest.param(BOT_CHECK_STDERR.replace("\u2019", "'"), id="straight-apostrophe"),
+        pytest.param(
+            "ERROR: [youtube] KM4Xe6Dlp0Y: SIGN IN TO CONFIRM YOU'RE NOT A BOT.\n", id="upper-case"
+        ),
+    ],
+)
+def test_bot_check_while_reading_metadata_raises_download_blocked(
+    tmp_path: Path, stderr: str
+) -> None:
+    source = YtDlpVideoSource(proxy_url=PROXY_URL, binary=a_failing_yt_dlp(tmp_path, stderr))
+
+    with pytest.raises(DownloadBlockedError, match="(?i)not a bot"):
+        source.metadata(VIDEO_URL)
+
+
+# @covers service:DLT-008
+def test_age_check_while_reading_metadata_raises_video_unavailable(tmp_path: Path) -> None:
+    source = YtDlpVideoSource(
+        proxy_url=PROXY_URL,
+        binary=a_failing_yt_dlp(
+            tmp_path,
+            "ERROR: [youtube] HtSuA80QTyo: Sign in to confirm your age. This video may be"
+            " inappropriate for some users.\n",
+        ),
+    )
+
+    with pytest.raises(VideoUnavailableError, match="Sign in to confirm your age"):
+        source.metadata(VIDEO_URL)
+
+
+# @covers service:DLT-008
+def test_bot_check_while_downloading_raises_download_blocked(tmp_path: Path) -> None:
+    source = YtDlpVideoSource(
+        proxy_url=PROXY_URL, binary=a_failing_yt_dlp(tmp_path, BOT_CHECK_STDERR)
+    )
+    download = source.download(VIDEO_URL, "KM4Xe6Dlp0Y", tmp_path)
+
+    with pytest.raises(DownloadBlockedError, match="not a bot"):
         an_outcome_after_exit(download)

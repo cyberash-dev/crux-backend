@@ -12,5 +12,5 @@ class VideoSourcePort(Protocol):
         self, youtube_url: str, video_id: str, dest_dir: Path
     ) -> RunningJobPort[Path]:
         """The job's outcome is the merged video file; a failed download raises
-        DownloadFailedError from outcome()."""
+        DownloadFailedError, a YouTube bot check DownloadBlockedError, from outcome()."""
         ...

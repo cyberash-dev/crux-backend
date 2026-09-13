@@ -10,6 +10,7 @@ from konspekt.worker.domain.failure_code import FailureCode
 from konspekt.worker.domain.file_kind import FileKind
 from konspekt.worker.domain.stored_file import StoredFile
 from konspekt.worker.domain.video_metadata import VideoMetadata
+from konspekt.worker.ports.outbound.download_blocked_error import DownloadBlockedError
 from konspekt.worker.ports.outbound.download_failed_error import DownloadFailedError
 from konspekt.worker.ports.outbound.video_unavailable_error import VideoUnavailableError
 from konspekt.worker.ports.outbound.worker_api_error import WorkerApiError
@@ -49,6 +50,8 @@ from tests.worker.worker_fakes import (
     longest_heartbeat_gap,
     the_only_log_record,
 )
+
+DOWNLOAD_BLOCKED_MESSAGE = "YouTube blocked the download with a bot check"
 
 REJECTED_VIDEOS = [
     pytest.param(
@@ -246,6 +249,7 @@ def test_video_of_exactly_four_hours_is_downloaded(tmp_path: Path) -> None:
     ]
 
 
+# @covers service:DLT-008
 def test_failed_metadata_request_fails_with_video_unavailable(tmp_path: Path) -> None:
     clock = FakeClock()
     worker_api = FakeWorkerApi(clock)
@@ -268,6 +272,7 @@ def a_failing_download_source() -> FakeVideoSource:
     return FakeVideoSource(PUBLIC_VIDEO, FakeRunningJob([do_nothing] * 2, download_error))
 
 
+# @covers service:DLT-008
 def test_download_failure_fails_with_download_failed(tmp_path: Path) -> None:
     clock = FakeClock()
     worker_api = FakeWorkerApi(clock)
@@ -292,6 +297,43 @@ def test_download_failure_does_not_start_the_build(tmp_path: Path) -> None:
     run.execute()
 
     assert build_runner.requests == []
+
+
+def a_bot_check_error() -> DownloadBlockedError:
+    return DownloadBlockedError(
+        "ERROR: [youtube] HtSuA80QTyo: Sign in to confirm you\u2019re not a bot."
+        " Use --cookies-from-browser or --cookies for the authentication."
+    )
+
+
+# @covers service:DLT-008
+def test_bot_check_while_reading_metadata_fails_with_download_blocked(tmp_path: Path) -> None:
+    clock = FakeClock()
+    worker_api = FakeWorkerApi(clock)
+    blocked_source = a_video_source(tmp_path, a_bot_check_error())
+    run = a_worker_run(tmp_path, clock, worker_api, blocked_source, a_staged_build())
+
+    run.execute()
+
+    assert worker_api.completions == [
+        FailedCompletion(FailureCode.DOWNLOAD_BLOCKED, DOWNLOAD_BLOCKED_MESSAGE)
+    ]
+
+
+# @covers service:DLT-008
+def test_bot_check_while_downloading_fails_with_download_blocked(tmp_path: Path) -> None:
+    clock = FakeClock()
+    worker_api = FakeWorkerApi(clock)
+    blocked_source = FakeVideoSource(
+        PUBLIC_VIDEO, FakeRunningJob([do_nothing] * 2, a_bot_check_error())
+    )
+    run = a_worker_run(tmp_path, clock, worker_api, blocked_source, a_staged_build())
+
+    run.execute()
+
+    assert worker_api.completions == [
+        FailedCompletion(FailureCode.DOWNLOAD_BLOCKED, DOWNLOAD_BLOCKED_MESSAGE)
+    ]
 
 
 @pytest.mark.parametrize(
