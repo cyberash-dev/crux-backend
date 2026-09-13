@@ -91,7 +91,7 @@ lifecycle:
     scope: first-time-approval
 partition_id: service
 name: konspekt/service-api
-version: "0.3.0"
+version: "0.4.0"
 boundary_type: api
 members:
   - service:CON-001
@@ -99,6 +99,7 @@ members:
   - service:GEN-001
 consumer_compat_policy: semver_per_surface
 notes: |
+  v0.4.0 — additive: run error code DOWNLOAD_BLOCKED (service:DLT-010).
   v0.3.0 — additive: exam sessions with the examiner (service:CON-003,
   service:DLT-002); run endpoints are unchanged.
   v0.2.0 — additive: the OpenAPI description control-plane/openapi.yaml
@@ -122,12 +123,14 @@ lifecycle:
     scope: first-time-approval
 partition_id: service
 name: konspekt/worker-api
-version: "0.1.0"
+version: "0.2.0"
 boundary_type: api
 members:
   - service:CON-002
 consumer_compat_policy: semver_per_surface
 notes: |
+  v0.2.0 — additive: failed completion code DOWNLOAD_BLOCKED
+  (service:DLT-011).
   v0.1.0 — sandbox worker to control plane: progress events, file
   uploads, completion.
 ---
@@ -182,17 +185,25 @@ when: the control plane processes the run queue
 then: |
   the run moves queued -> provisioning -> running -> succeeded or
   failed. Provisioning creates one sandbox per run from the configured
-  snapshot with the outbound proxy, the worker secrets as environment
+  snapshot with one outbound proxy, the worker secrets as environment
   variables, auto-stop disabled and a wall-clock TTL of 240 minutes,
   then starts the worker asynchronously. At most MAX_PARALLEL_RUNS runs
   (control-plane env, default 1) are in provisioning or running; the
   others wait in submission order. A run becomes succeeded only when
   the worker's completion carries the full result (service:CON-002),
   which is stored atomically with the status. After a terminal status
-  the sandbox is deleted.
+  the sandbox is deleted. PROXY_URL (control-plane env) holds one or
+  more proxy URLs separated by commas; every sandbox creation takes the
+  next URL of that list after the one the previous creation took,
+  wrapping around, across all runs.
 negative_cases:
   - sandbox creation or worker start fails => failed with
     SANDBOX_START_FAILED
+  - the worker reports DOWNLOAD_BLOCKED => the sandbox is deleted and
+    the run is provisioned again in a new sandbox with the next proxy,
+    keeping its place among the active runs, until the run has been
+    blocked once with every proxy of the list; then failed with
+    DOWNLOAD_BLOCKED
   - no worker event for 15 minutes while provisioning or running =>
     failed with WORKER_LOST; the sandbox is deleted
   - the worker reports failure => failed with the reported error code
@@ -216,16 +227,23 @@ test_obligation:
     active; a started worker moves the run to running; a success
     completion stores results and deletes the sandbox; a gateway
     failure yields SANDBOX_START_FAILED; a run silent for 15 minutes
-    yields WORKER_LOST and its sandbox is deleted.
+    yields WORKER_LOST and its sandbox is deleted; consecutive sandbox
+    creations take consecutive proxies of PROXY_URL, wrapping around; a
+    DOWNLOAD_BLOCKED completion re-provisions the run with the next
+    proxy, and the run fails with DOWNLOAD_BLOCKED once every proxy has
+    blocked it.
   test_template: integration
   boundary_classes:
     - queue respects MAX_PARALLEL_RUNS
     - success completion stores results and deletes the sandbox
     - sandbox creation failure
     - silent worker => WORKER_LOST
+    - proxy rotation across sandbox creations
+    - blocked download re-provisioned, then failed after the whole list
   failure_scenarios:
     - a run stuck in running forever
     - two sandboxes started for one run
+    - a blocked run retried forever with the same proxy
 ---
 ```
 
@@ -262,7 +280,10 @@ then: |
   cut log, LLM spend). On failure it posts a failed completion with a
   code: VIDEO_UNAVAILABLE (metadata rejected or unavailable),
   DOWNLOAD_FAILED (download error), CONFIGURATION_ERROR (build exit 2),
-  PIPELINE_FAILED (build exit 1).
+  PIPELINE_FAILED (build exit 1), DOWNLOAD_BLOCKED (YouTube asks yt-dlp
+  to sign in to confirm it is not a bot, while reading metadata or
+  downloading; the message is a fixed readable sentence, not yt-dlp
+  output).
 negative_cases:
   - the control plane rejects the run token => the worker stops without
     running further stages
@@ -584,6 +605,7 @@ schema:
     - DOWNLOAD_FAILED
     - CONFIGURATION_ERROR
     - PIPELINE_FAILED
+    - DOWNLOAD_BLOCKED
 preconditions:
   - SERVICE_API_KEY is configured in the control-plane environment
 postconditions:
@@ -598,7 +620,8 @@ external_identifiers:
 compatibility_rules:
   - removing or renaming a field, path, status or error code => major
     bump on service:SUR-001
-  - adding an optional request field or a response field => minor bump
+  - adding an optional request field, a response field or a run error
+    code => minor bump
 error_taxonomy:
   - "401 UNAUTHORIZED — missing or wrong API key"
   - "422 INPUT_NOT_YOUTUBE — host not youtube.com, www.youtube.com,
@@ -670,6 +693,12 @@ schema:
       llm_spend_usd}, files: [{kind, name, storage_id, size_bytes,
       content_type}]} or {status: failed, error: {code, message}} =>
       204"
+  failure_codes:
+    - VIDEO_UNAVAILABLE
+    - DOWNLOAD_FAILED
+    - DOWNLOAD_BLOCKED
+    - CONFIGURATION_ERROR
+    - PIPELINE_FAILED
 preconditions:
   - the run exists and its token hash matches
 postconditions:
@@ -926,7 +955,7 @@ authority_url_or_doc: "https://www.daytona.io/docs/"
 consumer_contract:
   request:
     - sandbox create from snapshot WORKER_SNAPSHOT with outboundProxyUrl
-      PROXY_URL, envVars (worker variables and pipeline credentials),
+      set to one URL of the PROXY_URL list (service:REQ-001), envVars (worker variables and pipeline credentials),
       autoStopInterval 0, ttlMinutes 240, labels {run_id}
     - an asynchronous session command starts konspekt-worker
     - sandbox delete after a terminal run status
@@ -1016,8 +1045,12 @@ auth_scope:
 rate_limits:
   - one download per run
 retry/idempotency:
-  - no retry inside a run
+  - no retry inside a sandbox; a blocked run is provisioned again with
+    the next proxy (service:REQ-001)
 error_taxonomy:
+  - "bot check (yt-dlp reports that YouTube asks to sign in to confirm
+    it is not a bot) while reading metadata or downloading =>
+    DOWNLOAD_BLOCKED"
   - "metadata failure or rejection => VIDEO_UNAVAILABLE"
   - "download or merge failure => DOWNLOAD_FAILED"
 sandbox_or_fixture:
@@ -1026,7 +1059,9 @@ test_obligation:
   predicate: |
     The worker's video source adapter builds the documented commands and
     maps a metadata JSON fixture to title, channel, duration and
-    availability; a live, upcoming or private fixture is rejected.
+    availability; a live, upcoming or private fixture is rejected; a
+    bot-check message from yt-dlp while reading metadata or downloading
+    becomes DOWNLOAD_BLOCKED.
   test_template: contract
   boundary_classes:
     - public metadata accepted
@@ -1465,6 +1500,130 @@ test_obligation:
   not_applicable: capacity_assumption_only
   reason: the delta resizes sandboxes and a deployment setting; no code
     path changes, the capacity is checked by the live parallel-run check
+---
+```
+
+```yaml
+---
+id: service:DLT-008
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:02:17.419Z
+    change_request: proxy rotation and DOWNLOAD_BLOCKED (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+target_id: service:REQ-002
+kind: extend
+compatibility_action: ignore
+baseline_version: 8561c13
+summary: |
+  When yt-dlp reports that YouTube asks it to sign in to confirm it is
+  not a bot, while reading metadata or downloading, the worker fails the
+  run with DOWNLOAD_BLOCKED and a fixed readable message instead of
+  VIDEO_UNAVAILABLE or DOWNLOAD_FAILED carrying raw yt-dlp output
+  (service:EXT-002 error taxonomy). The bot check follows the exit IP of
+  the proxy, not the video.
+tests_old_behavior:
+  - tests/worker (metadata rejection and download failure codes unchanged)
+tests_new_behavior:
+  - tests/worker (bot-check output at metadata and at download yields
+    DOWNLOAD_BLOCKED with the fixed message)
+---
+```
+
+```yaml
+---
+id: service:DLT-009
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:02:17.478Z
+    change_request: proxy rotation and DOWNLOAD_BLOCKED (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+target_id: service:REQ-001
+kind: extend
+compatibility_action: ignore
+baseline_version: 8561c13
+summary: |
+  PROXY_URL holds a comma-separated list of proxies and sandbox
+  creations take them round-robin (service:EXT-001), so the load spreads
+  over the proxy pool. A DOWNLOAD_BLOCKED completion no longer ends the
+  run: the control plane provisions it again with the next proxy until
+  every proxy of the list has blocked it, and only then fails it with
+  DOWNLOAD_BLOCKED. A single URL keeps the previous behavior apart from
+  the new failure code.
+tests_old_behavior:
+  - control-plane/convex/orchestration.test.ts (queue, completion,
+    watchdog)
+tests_new_behavior:
+  - control-plane/convex/orchestration.test.ts (proxy rotation,
+    re-provisioning of a blocked run, failure after the whole list)
+---
+```
+
+```yaml
+---
+id: service:DLT-010
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:02:17.540Z
+    change_request: proxy rotation and DOWNLOAD_BLOCKED (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+target_id: service:SUR-001
+kind: extend
+compatibility_action: ignore
+baseline_version: 8561c13
+summary: |
+  service:CON-001 gains the run error code DOWNLOAD_BLOCKED, reported
+  when every proxy was blocked by the YouTube bot check => 0.4.0
+  (additive). The OpenAPI description lists the new code.
+tests_old_behavior:
+  - control-plane/convex/clientApi.test.ts (run endpoints unchanged)
+tests_new_behavior:
+  - control-plane/convex/openapiDescription.test.ts (run error codes
+    include DOWNLOAD_BLOCKED)
+---
+```
+
+```yaml
+---
+id: service:DLT-011
+type: Delta
+lifecycle:
+  status: approved
+  approval_record:
+    owner_role: tech-lead
+    approver_identity: cyberash
+    timestamp: 2026-09-13T16:02:17.601Z
+    change_request: proxy rotation and DOWNLOAD_BLOCKED (user approval in chat 2026-09-13, approval delegated per pipeline:ASM-001)
+    scope: first-time-approval
+partition_id: service
+target_id: service:SUR-002
+kind: extend
+compatibility_action: ignore
+baseline_version: 8561c13
+summary: |
+  service:CON-002 lists its failure codes and accepts DOWNLOAD_BLOCKED
+  in a failed completion => 0.2.0 (additive); the worker snapshot is
+  rebuilt with the worker that sends it.
+tests_old_behavior:
+  - control-plane/convex/workerApi.test.ts (completion handling)
+tests_new_behavior:
+  - control-plane/convex/workerApi.test.ts (DOWNLOAD_BLOCKED completion
+    accepted)
 ---
 ```
 
